@@ -6,7 +6,7 @@ Non is a bonded constitutional tribunal on GenLayer. Validators independently
 re-fetch HTTPS evidence and decide whether a proposal satisfies a pinned
 constitution. Outcomes are APPROVE, REJECT, REVISE, or INCONCLUSIVE. Proposer
 and challenger bonds make false verdicts costly. INCONCLUSIVE refunds bonds
-exactly. Chain 61997 Studio Next; state may reset.
+exactly. Live at `0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76` on chain 61997 Studio Next; state may reset.
 
 ## The contested claim
 
@@ -50,9 +50,17 @@ One-way, toward the outcome that moves no money.
 
 ## Status
 
-**Not deployed.** See [`STATUS.md`](STATUS.md) for exactly what has and has
-not been verified. No live address is claimed anywhere in this repository, and
-the frontend ships with an empty `VITE_CONTRACT_ADDRESS` so it fails closed.
+**Live on Studio Next (chain 61997)** at
+[`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76), verified by `gen_getContractSchema` and a
+real on-chain `get_config` read.
+
+What is **not** yet proven on chain: no case has been opened, because
+`open_case`, `challenge` and `finalize` are payable and `genlayer write`
+cannot attach native GEN. The full case lifecycle — all four outcomes, the
+appeal window, and every branch of the bond ledger — is proven in gltest
+direct-mode against a real GenVM sandbox. See [`STATUS.md`](STATUS.md) for the
+exact five-step on-chain smoke test that was run, and for what it does not
+cover.
 
 ## Evidence for review
 
@@ -64,8 +72,8 @@ the frontend ships with an empty `VITE_CONTRACT_ADDRESS` so it fails closed.
 | Lint | `genvm-lint check build/Non.bundled.py` — clean |
 | Architecture | [`architecture.md`](architecture.md) |
 | Self-audit | [`audit.md`](audit.md) — including two real bugs caught pre-deploy |
-| Live app | Not deployed |
-| Explorer | Not deployed |
+| Live contract | [`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76) |
+| Explorer | https://explorer-studio-dev.genlayer.com |
 
 ## What a reviewer should look at first
 

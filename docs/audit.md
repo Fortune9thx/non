@@ -174,9 +174,14 @@ canonical outcomes, and cannot move money without a second node agreeing.
 
 ## Known limits and unproven claims
 
-1. **Not deployed.** No live address, no on-chain smoke test. Everything here
-   is proven in gltest direct-mode against a real GenVM sandbox, which is a
-   genuine execution proof but not a network proof. See `docs/STATUS.md`.
+1. **Deployed, but no case has run on chain.** The contract is live at
+   `0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76` and a five-step smoke test passed (see `docs/STATUS.md`), but no
+   case has been opened, evaluated or settled on the real network — the bonded
+   methods are payable and the CLI cannot attach native GEN. The full
+   lifecycle is proven in gltest direct-mode against a real GenVM sandbox,
+   which is a genuine execution proof but not a network proof. In particular,
+   `gl.nondet.web.get` and `gl.nondet.exec_prompt` have only ever run against
+   gltest's mocks.
 2. **Payable methods are untestable from the CLI.** `genlayer write` has no
    flag for attaching native GEN, so a real bonded call requires a wallet or a
    direct `genlayer-js` script. `open_case`, `challenge` and `finalize` are

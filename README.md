@@ -66,9 +66,10 @@ by default.
 - **Network:** GenLayer Studio Dev / Studio Next, chain id **61997**
 - **RPC:** `https://studio-dev.genlayer.com/api`
 - **Explorer:** `https://explorer-studio-dev.genlayer.com`
-- **Contract address:** see [`docs/STATUS.md`](docs/STATUS.md) — **not yet
-  deployed at the time of writing.** The frontend fails closed and says so
-  rather than showing invented data.
+- **Contract address:** [`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76) — **live**, verified by
+  `gen_getContractSchema` (14 methods) and a real on-chain read of
+  `get_config`. Deploy tx
+  [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0x4ca5244a86e67d3606dc93e74fafda59c67b9acb50a0527fc5c69276e8ec2311).
 
 Studio Next is a development network. Its operators can reset it; if that
 happens, deployed contracts and every case in them are gone and the protocol

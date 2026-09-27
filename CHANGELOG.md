@@ -4,7 +4,19 @@ All notable changes to Non are recorded here.
 
 ## [1.0.0] — 2026-09-27
 
-Initial build. Not deployed.
+Initial build. **Deployed and verified live on GenLayer Studio Next**
+(chain 61997) at `0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`.
+
+### Deployed
+- Five-step on-chain smoke test: deploy accepted; `gen_getContractSchema`
+  returns 14 methods; `get_config` returns the expected constants with an
+  uncorrupted treasury address; `register_scope` + `set_constitution` write
+  real state; and a negative call returns the contract's own `case missing`
+  `UserError` from chain.
+- The frontend was pointed at the live address and confirmed reading real
+  state, including the constitution written in the smoke test.
+- Not yet on chain: no case has been opened, because the bonded methods are
+  payable and `genlayer write` cannot attach native GEN.
 
 ### Contract
 - Bonded constitutional tribunal with four canonical outcomes: APPROVE,

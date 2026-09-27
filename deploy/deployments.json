@@ -4,8 +4,10 @@
     "chain_id": 61997,
     "rpc": "https://studio-dev.genlayer.com/api",
     "explorer": "https://explorer-studio-dev.genlayer.com",
-    "address": "",
-    "deploy_tx": "",
-    "verified_live_at": null
+    "address": "0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76",
+    "deploy_tx": "0x4ca5244a86e67d3606dc93e74fafda59c67b9acb50a0527fc5c69276e8ec2311",
+    "treasury": "0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537",
+    "verified_live_at": "2026-09-27",
+    "verified_by": "gen_getContractSchema returned 14 methods; get_config returned the expected protocol constants"
   }
 }
