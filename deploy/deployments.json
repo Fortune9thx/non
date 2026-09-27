@@ -1,0 +1,11 @@
+{
+  "_comment": "An address is recorded here ONLY after gen_getContractSchema confirms it is live. An empty address means not deployed, and the frontend fails closed on it.",
+  "studio_next": {
+    "chain_id": 61997,
+    "rpc": "https://studio-dev.genlayer.com/api",
+    "explorer": "https://explorer-studio-dev.genlayer.com",
+    "address": "",
+    "deploy_tx": "",
+    "verified_live_at": null
+  }
+}

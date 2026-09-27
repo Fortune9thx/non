@@ -1,0 +1,14 @@
+# gltest network configuration for Non.
+# `artifacts` is gltest's own scratch directory and is cleared on every run,
+# which is why the deployable bundle is written to build/ instead.
+networks:
+  default: localnet
+  localnet:
+    url: http://127.0.0.1:4000/api
+    id: 61999
+  studio_devnet:
+    url: https://studio-dev.genlayer.com/api
+    id: 61997
+paths:
+  contracts: contracts
+  artifacts: artifacts
