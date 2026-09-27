@@ -757,3 +757,125 @@ class TestValidatorIndependence:
         _mock_evidence(direct_vm, status=404, body="<p>gone</p>")
         direct_vm.mock_llm(r".*", _verdict("approve", "approved"))
         assert direct_vm.run_validator() is False
+
+
+EXPIRY = 72 * 60 * 60
+
+
+# ---------------------------------------------------------------------------
+# Bounded liveness escape hatch
+# ---------------------------------------------------------------------------
+
+
+class TestExpiry:
+    def test_open_case_cannot_expire_early(self, scoped, direct_vm):
+        case_id = _open_case(scoped, direct_vm)
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY - 60)))
+        with pytest.raises(Exception, match=re.escape("case not expired")):
+            scoped.expire_case(case_id=case_id)
+
+    def test_stuck_open_case_expires_and_refunds_exactly(self, scoped, direct_vm,
+                                                         direct_alice, direct_owner):
+        """A case whose evaluation never converges must still release its
+        bond. This is the path that exists because 'permissionlessly
+        retriable' is not 'guaranteed to converge'."""
+        case_id = _open_case(scoped, direct_vm, sender=direct_alice)
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
+        assert scoped.expire_case(case_id=case_id) == "inconclusive"
+
+        rec = _case(scoped, case_id)
+        assert rec["state"] == "FINAL"
+        assert rec["expired"] is True
+        assert rec["decision"] == "inconclusive"
+        assert _claimable(scoped, direct_alice) == REVIEW_BOND
+        assert _claimable(scoped, direct_owner) == 0  # no fee, ever
+
+    def test_expiry_is_permissionless(self, scoped, direct_vm, direct_alice,
+                                      direct_bob):
+        case_id = _open_case(scoped, direct_vm, sender=direct_alice)
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
+        with direct_vm.prank(direct_bob):
+            scoped.expire_case(case_id=case_id)
+        assert _claimable(scoped, direct_alice) == REVIEW_BOND
+        assert _claimable(scoped, direct_bob) == 0
+
+    def test_stuck_challenged_case_expires_and_refunds_both_sides(
+        self, scoped, direct_vm, direct_alice, direct_bob, direct_owner
+    ):
+        case_id = _open_case(scoped, direct_vm, sender=direct_alice)
+        _decide(scoped, direct_vm, case_id, "approve", "approved")
+        with direct_vm.prank(direct_bob):
+            direct_vm.value = CHALLENGE_BOND
+            scoped.challenge(case_id=case_id, note="Claim 2 is false.")
+
+        # The re-evaluation never converges.
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
+        scoped.expire_case(case_id=case_id)
+
+        assert _claimable(scoped, direct_alice) == REVIEW_BOND
+        assert _claimable(scoped, direct_bob) == CHALLENGE_BOND
+        assert _claimable(scoped, direct_owner) == 0
+
+    def test_decided_unchallenged_case_cannot_be_expired(self, scoped, direct_vm):
+        """finalize already settles it. An expiry path here would be a way
+        to dodge a resolved REJECT."""
+        case_id = _open_case(scoped, direct_vm)
+        _decide(scoped, direct_vm, case_id, "reject", "rejected")
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY * 10)))
+        with pytest.raises(Exception, match=re.escape("case not expirable")):
+            scoped.expire_case(case_id=case_id)
+
+    def test_expiry_cannot_reopen_a_final_case(self, scoped, direct_vm):
+        case_id = _open_case(scoped, direct_vm)
+        _decide(scoped, direct_vm, case_id, "approve", "approved")
+        _finalize_after_window(scoped, direct_vm, case_id)
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY * 10)))
+        with pytest.raises(Exception, match=re.escape("case already final")):
+            scoped.expire_case(case_id=case_id)
+
+    def test_expired_bond_is_actually_claimable(self, scoped, direct_vm,
+                                                direct_alice):
+        case_id = _open_case(scoped, direct_vm, sender=direct_alice)
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
+        scoped.expire_case(case_id=case_id)
+        with direct_vm.prank(direct_alice):
+            assert int(scoped.claim()) == REVIEW_BOND
+
+
+# ---------------------------------------------------------------------------
+# Envelope binding: the verdict must be about THIS case, citing THIS case's
+# locked evidence. A prompt asking for the right id is not code checking the
+# right id came back.
+# ---------------------------------------------------------------------------
+
+
+class TestEnvelopeBinding:
+    def test_validator_rejects_a_verdict_naming_another_case(self, scoped,
+                                                             direct_vm):
+        case_id = _open_case(scoped, direct_vm)
+        _decide(scoped, direct_vm, case_id, "approve", "approved")
+        other = json.dumps({
+            "case_id": "NON-999999", "decision": "approve", "outcome": "approved",
+            "score": 70, "fit_score": 70, "risk": 30,
+            "rules_version": "v1.0", "evidence": [{"ok": True}],
+        })
+        assert direct_vm.run_validator(leader_result=other) is False
+
+    def test_agreed_verdict_records_its_own_case_id(self, scoped, direct_vm):
+        case_id = _open_case(scoped, direct_vm)
+        _decide(scoped, direct_vm, case_id, "approve", "approved")
+        report = json.loads(scoped.get_case_evidence(case_id=case_id))
+        assert report["report"], "evidence report should survive binding"
+        for row in report["report"]:
+            assert row["url"] in report["urls"]
+
+    def test_stored_evidence_only_ever_cites_locked_urls(self, scoped, direct_vm):
+        """Whatever the leader reports, every stored evidence row must name a
+        url this case actually locked. The void-on-mismatch rule itself is
+        exercised exhaustively in tests/unit/test_non_lib.py."""
+        case_id = _open_case(scoped, direct_vm)
+        _decide(scoped, direct_vm, case_id, "approve", "approved")
+        rec = _case(scoped, case_id)
+        assert rec["evidence_report"]
+        for row in rec["evidence_report"]:
+            assert row["url"] in rec["evidence_urls"]

@@ -5,7 +5,7 @@ All notable changes to Non are recorded here.
 ## [1.0.0] — 2026-09-27
 
 Initial build. **Deployed and verified live on GenLayer Studio Next**
-(chain 61997) at `0xb263b7E8972D243639F797948A3322cE1Ca657dc`.
+(chain 61997) at `0xfc34Ce61034952807899B8abE172BF76cC6036a0`.
 
 ### Deployed
 - Five-step on-chain smoke test: deploy accepted; `gen_getContractSchema`
@@ -61,7 +61,7 @@ Initial build. **Deployed and verified live on GenLayer Studio Next**
   nondeterministic calls the linter could not trace to the equivalence block.
 
 ### Tests
-- 144 passing: 85 pure-logic (no genlayer import) and 59 gltest direct-mode
+- 144 passing: 101 pure-logic (no genlayer import) and 69 gltest direct-mode
   against a real GenVM sandbox, including 8 that execute the real captured
   validator closure.
 

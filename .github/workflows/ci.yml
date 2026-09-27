@@ -12,7 +12,7 @@ jobs:
   # every rule and every branch of the bond ledger still holds.
   # ---------------------------------------------------------------------------
   contract:
-    name: contract — bundle + pure-logic tests
+    name: contract — bundle + lint + pure-logic tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +24,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest genvm-linter
 
       - name: Build the deployable bundle
         run: python scripts/build_bundle.py
@@ -35,10 +35,23 @@ jobs:
         # does not contain what it claims to.
         run: git diff --exit-code -- build/Non.bundled.py
 
+      - name: Lint the bundle (AST safety checks)
+        # genvm-lint's `lint` stage is the SDK-free half of `check`: it runs
+        # the AST-based safety checks and needs no runner tarball, so it is a
+        # real gate that passes on a cold runner. The `check` command's
+        # second stage (schema validation) needs the pinned SDK and lives in
+        # the genvm job below.
+        env:
+          PYTHONIOENCODING: utf-8
+        run: genvm-lint lint build/Non.bundled.py
+
       - name: Pure-logic tests
         # tests/unit imports contracts/non_lib.py, which has zero genlayer
         # imports, so this needs no SDK and no network.
         run: python -m pytest tests/unit -q
+
+      - name: Contract source must be LF-only
+        run: python scripts/check_line_endings.py
 
   # ---------------------------------------------------------------------------
   # These need the py-genlayer runner for the exact SDK version pinned in the
@@ -82,7 +95,9 @@ jobs:
       - name: Build the deployable bundle
         run: python scripts/build_bundle.py
 
-      - name: Lint the bundle
+      - name: Lint and validate the bundle
+        env:
+          PYTHONIOENCODING: utf-8
         run: genvm-lint check build/Non.bundled.py
 
       - name: Direct-mode contract tests

@@ -6,7 +6,7 @@ Non is a bonded constitutional tribunal on GenLayer. Validators independently
 re-fetch HTTPS evidence and decide whether a proposal satisfies a pinned
 constitution. Outcomes are APPROVE, REJECT, REVISE, or INCONCLUSIVE. Proposer
 and challenger bonds make false verdicts costly. INCONCLUSIVE refunds bonds
-exactly. Live at `0xb263b7E8972D243639F797948A3322cE1Ca657dc` on chain 61997 Studio Next; state may reset.
+exactly. Live at `0xfc34Ce61034952807899B8abE172BF76cC6036a0` on chain 61997 Studio Next; state may reset.
 
 ## The contested claim
 
@@ -51,7 +51,7 @@ One-way, toward the outcome that moves no money.
 ## Status
 
 **Live on Studio Next (chain 61997)** at
-[`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc), verified by `gen_getContractSchema` and a
+[`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0), verified by `gen_getContractSchema` and a
 real on-chain `get_config` read.
 
 One real case, **NON-000001**, has been opened with a 2 GEN bond and
@@ -76,7 +76,7 @@ for exactly what was run and what it does not cover.
 | Lint | `genvm-lint check build/Non.bundled.py` — clean |
 | Architecture | [`architecture.md`](architecture.md) |
 | Self-audit | [`audit.md`](audit.md) — including two real bugs caught pre-deploy |
-| Live contract | [`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc) |
+| Live contract | [`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0) |
 | Explorer | https://explorer-studio-dev.genlayer.com |
 
 ## What a reviewer should look at first

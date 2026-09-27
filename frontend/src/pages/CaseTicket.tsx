@@ -10,13 +10,13 @@ import {
   getCase,
   getConfig,
   shortAddr,
+  submitWrite,
   toWei,
-  writeContract,
   type CaseRecord,
   type Config,
 } from "../lib/chain";
 
-type Busy = "" | "evaluate" | "challenge" | "finalize";
+type Busy = "" | "evaluate" | "challenge" | "finalize" | "expire";
 
 export default function CaseTicket() {
   const { caseId = "" } = useParams();
@@ -49,14 +49,21 @@ export default function CaseTicket() {
 
   useEffect(load, [load]);
 
+  // A transaction hash is a receipt of submission, not of success. Every
+  // action waits for a terminal state and checks it before this page shows
+  // anything as done -- an UNDETERMINED consensus outcome records nothing
+  // at all, and must never be rendered as a completed action.
   const run = async (kind: Busy, method: string, args: unknown[], value?: bigint) => {
     if (!account) return;
     setBusy(kind);
     setActionError("");
     setTxHash("");
     try {
-      const hash = await writeContract({ method, args, value, account });
-      setTxHash(hash);
+      const outcome = await submitWrite({ method, args, value, account });
+      setTxHash(outcome.hash);
+      if (!outcome.ok) {
+        setActionError(outcome.reason);
+      }
       load();
       refreshWallet();
     } catch (err) {
@@ -101,6 +108,12 @@ export default function CaseTicket() {
     !appealOpen &&
     (!record.challenger || record.eval_rounds >= 2);
 
+  // The bounded escape hatch: only offered once a case has actually been
+  // stuck past its expiry window with no reachable verdict.
+  const expiryDeadline = record.expiry_deadline ?? 0;
+  const canExpire =
+    !!account && state !== "FINAL" && expiryDeadline > 0 && now >= expiryDeadline;
+
   return (
     <>
       <div className="row between wrap gap-16">
@@ -119,14 +132,14 @@ export default function CaseTicket() {
         </Link>
       </div>
 
-      {txHash && (
+      {txHash && !actionError && (
         <div className="banner banner-live">
           <div>
-            <strong>Submitted.</strong>{" "}
+            <strong>Confirmed on chain.</strong>{" "}
             <a className="mono" href={explorerTx(txHash)} target="_blank" rel="noreferrer">
               {shortAddr(txHash)}
             </a>{" "}
-            — state updates once the transaction finalizes.
+            — the case record above reflects it.
           </div>
         </div>
       )}
@@ -240,6 +253,12 @@ export default function CaseTicket() {
                   <Block title="Uncertainty" body={record.uncertainty} />
                 )}
 
+                <p className="hint" style={{ marginBottom: 0, marginTop: 18 }}>
+                  Retrieval status is the adjudicator's own fetch record. It is
+                  bound to this case's locked urls, but it is not itself
+                  re-agreed field by field — what consensus protects is the
+                  verdict it produced.
+                </p>
                 <p className="hint" style={{ marginBottom: 0, marginTop: 18 }}>
                   Scores are informational. Only decision, outcome and the pinned
                   constitution version are enforced by the equivalence rule
@@ -446,6 +465,25 @@ export default function CaseTicket() {
                   ? "Available once the appeal window closes."
                   : "Writes the bond ledger. Permissionless."}
               </p>
+
+              {canExpire && (
+                <>
+                  <hr className="rule" />
+                  <button
+                    className="btn btn-ghost"
+                    disabled={busy !== ""}
+                    onClick={() => run("expire", "expire_case", [record.case_id])}
+                  >
+                    {busy === "expire" ? "Expiring…" : "Expire and refund"}
+                  </button>
+                  <p className="hint" style={{ margin: 0 }}>
+                    This case has gone {Math.round(
+                      (config?.expiry_seconds ?? 259200) / 3600
+                    )}h without a reachable verdict. Expiring it returns every
+                    bond exactly, with no fee and no winner.
+                  </p>
+                </>
+              )}
             </div>
           </section>
         </div>

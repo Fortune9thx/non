@@ -67,10 +67,10 @@ by default.
 - **RPC:** `https://studio-dev.genlayer.com/api`
 - **Explorer:** `https://explorer-studio-dev.genlayer.com`
 - **App:** [https://non-omega.vercel.app](https://non-omega.vercel.app) — live, reading the contract above
-- **Contract address:** [`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc) — **live**, verified by
+- **Contract address:** [`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0) — **live**, verified by
   `gen_getContractSchema` (14 methods) and a real on-chain read of
   `get_config`. Deploy tx
-  [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0xb551f25c47e3bf0320c948853a3068810f2c8bc31c86a139564d17c9402f5bd9).
+  [`0xe16cc1269e082ddd…`](https://explorer-studio-dev.genlayer.com/tx/0xe16cc1269e082ddd23fd4a4d53fcbcf7719385023ef136051af86294dfe74167).
 
 Studio Next is a development network. Its operators can reset it; if that
 happens, deployed contracts and every case in them are gone and the protocol
@@ -83,13 +83,13 @@ pip install genlayer-test genvm-linter Pillow pytest
 python -m pytest tests -q
 ```
 
-144 tests, in two layers:
+170 tests, in two layers:
 
-- `tests/unit` — 85 plain-pytest tests over `contracts/non_lib.py`, which has
+- `tests/unit` — 101 plain-pytest tests over `contracts/non_lib.py`, which has
   zero genlayer imports. URL allowlist and SSRF guard, enum canonicalization,
   evidence normalization, the equivalence comparator, and every branch of the
   bond ledger including value conservation.
-- `tests/direct` — 59 gltest direct-mode tests that deploy the real bundle
+- `tests/direct` — 69 gltest direct-mode tests that deploy the real bundle
   into a GenVM sandbox and drive the whole flow: scopes, constitutions,
   version pinning, all four outcomes, the appeal window, bond accounting, and
   claims. Eight of them run the **real captured validator closure** with the

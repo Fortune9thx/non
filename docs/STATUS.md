@@ -7,9 +7,9 @@ _Last updated: 2026-09-27 — deployed and verified live._
 | | |
 | --- | --- |
 | **Deployed** | **Yes — live on Studio Next.** |
-| Address | [`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc) |
+| Address | [`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0) |
 | Live app | https://non-omega.vercel.app |
-| Deploy tx | [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0xb551f25c47e3bf0320c948853a3068810f2c8bc31c86a139564d17c9402f5bd9) — `ACCEPTED` |
+| Deploy tx | [`0xe16cc1269e082ddd…`](https://explorer-studio-dev.genlayer.com/tx/0xe16cc1269e082ddd23fd4a4d53fcbcf7719385023ef136051af86294dfe74167) — `ACCEPTED` |
 | Treasury / owner | `0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537` |
 | Target network | GenLayer Studio Dev / Studio Next, chain id 61997 |
 | RPC | `https://studio-dev.genlayer.com/api` |
@@ -27,76 +27,89 @@ detects that and renders its real empty state rather than stale data.
 
 | Layer | Count | What it proves |
 | --- | --- | --- |
-| `tests/unit` | 69 | Pure logic in isolation: URL allowlist + SSRF guard, enum canonicalization, evidence normalization, the equivalence comparator, full bond ledger with value conservation. No genlayer import. |
-| `tests/direct` | 59 | The real bundle deployed into a GenVM sandbox: scopes, constitution pinning, all four outcomes, the appeal window (via `warp`), bond accounting, claims, config floors. |
+| `tests/unit` | 101 | Pure logic in isolation: URL allowlist + SSRF guard, enum canonicalization, evidence normalization, envelope binding, the equivalence comparator, the expiry predicate, and the full bond ledger with value conservation. No genlayer import. |
+| `tests/direct` | 69 | The real bundle deployed into a GenVM sandbox: scopes, constitution pinning, all four outcomes, the appeal window and the 72h expiry window (via `warp`), bond accounting, claims, config floors. |
 | — of which validator | 8 | The **real captured validator closure**, run with web/LLM mocks swapped underneath it. |
-| **Total** | **128** | All passing. |
+| — of which event guards | 16 | Parse the contract source and enforce the indexed-field limit and ordering rules that gltest cannot reach. |
+| **Total** | **170** | All passing. |
 
 ## Verification actually performed
 
 Local:
 
-- `python -m pytest tests -q` → 128 passed.
+- `python -m pytest tests -q` → 170 passed.
 - `genvm-lint check build/Non.bundled.py` → lint + validation pass.
 - `npm run build` in `frontend/` → clean; `tsc -b --noEmit` clean.
 
-On chain (Studio Next, 2026-09-27) — a real five-step smoke test:
+On chain (Studio Next, 2026-09-27):
 
-1. **Deploy** → `ACCEPTED`, contract address above.
-2. **`gen_getContractSchema`** → returns all **14 methods**. (`eth_getCode` on
-   this same live address returns `0x`, confirming first-hand that it is the
-   wrong liveness probe for an intelligent contract.)
-3. **`get_config`** → returns the expected constants: 2 GEN review and
-   challenge bonds, 1 GEN settle bond, 21600 s appeal window, 200 bps fee, the
-   four decisions, `case_count: 0`. The `treasury` field came back as a clean
+1. **Deploy** -> `ACCEPTED`, contract address above.
+2. **`gen_getContractSchema`** -> returns all **15 methods**. (`eth_getCode`
+   on a live address returns `0x`, confirming first-hand that it is the wrong
+   liveness probe for an intelligent contract.)
+3. **`get_config`** -> the expected constants: 2 GEN review and challenge
+   bonds, 1 GEN settle bond, 21600 s appeal window, 259200 s expiry window,
+   200 bps fee, the four decisions. The `treasury` field came back as a clean
    42-character address, confirming the bare `--args 0xADDR` form did not
    corrupt it.
-4. **`register_scope` + `set_constitution`** (real writes) → `core-grants` v1.0
-   pinned on chain, with `rules_json` stored canonically as
-   `{"max_budget_gen":1000,"requires_public_repo":true}`.
-5. **Negative test** — `evaluate_case` on a nonexistent case id. The leader
-   receipt's decoded result is `b'case missing'`: the contract's own
-   `UserError` string, returned from chain. That proves deploy, storage, write
-   dispatch and error handling all work live, without moving any funds.
+4. **`register_scope` + `set_constitution`** -> `core-grants` v1.0 pinned on
+   chain, `rules_json` stored canonically.
+5. **Two real bonded cases opened and adjudicated** -- see below.
+6. **Negative test** (on the previous deploy of the same code path) --
+   `evaluate_case` on a nonexistent case id returned the contract's own
+   `UserError` string, decoded from the leader receipt as
+   `b'case missing'`, proving storage, write dispatch and error handling
+   work live without moving funds.
 
 The frontend was then pointed at the live address and confirmed reading real
 state: the network chip goes green, `get_config` populates the bond and window
-chips, the board correctly shows zero cases, and the constitution page renders
-the `core-grants` rules that were written on chain in step 4.
+chips, and both cases render with their real verdicts and evidence.
 
-## Live case NON-000001
+## Live cases
 
-A real case was opened, bonded and adjudicated on chain:
+Two real cases were opened with genuine 2 GEN bonds and adjudicated on chain
+against the deployed contract. Both nondeterministic paths ran for real:
+`gl.nondet.web.get` fetched the evidence and `gl.nondet.exec_prompt` produced
+the verdict, and both transactions finished `SUCCESS` — meaning validators
+independently re-fetched, re-ran the prompt, and agreed.
 
-| | |
-| --- | --- |
-| Proposal | "Fund continued work on Non" against `core-grants` v1.0 |
-| Claims | the repository is public; the project is MIT licensed |
-| Evidence | the GitHub repo page and the raw `LICENSE` file |
-| Review bond | **2 GEN**, attached as real native value |
-| Verdict | **APPROVE** / `approved`, score 95, fit 96, risk 8 |
-| Evidence fetches | both URLs retrieved, status 200 |
+Both cases used the same proposal ("Fund continued work on Non" against
+`core-grants` v1.0), claiming the repository is public and MIT licensed, with
+the GitHub repo page and the raw `LICENSE` file as evidence.
 
-Both nondeterministic paths ran for real: `gl.nondet.web.get` fetched the two
-pages and `gl.nondet.exec_prompt` produced a verdict that cites each piece of
-evidence specifically. The transaction finished `SUCCESS`, which means the
-**validators independently re-fetched the evidence, re-ran the prompt, and
-agreed** — the equivalence principle holding in production, not in a mock.
+| | NON-000002 | NON-000001 |
+| --- | --- | --- |
+| Verdict | **APPROVE** / `approved` | **INCONCLUSIVE** |
+| Scores | 95 / fit 100 / risk 5 | 0 / 0 / 0 |
+| Evidence | both urls retrieved, 200 | both urls retrieved, 200 |
+| Reasoning | cites both evidence records and the budget limit | none produced |
 
-The case is viewable at https://non-omega.vercel.app/app/cases/NON-000001.
+The two together are more useful than either alone. NON-000002 is the
+substantive path working end to end. **NON-000001 is the fail-closed path
+firing for real**: on that run `exec_prompt` returned something the contract
+could not parse into a legal verdict, so canonicalization collapsed it to
+INCONCLUSIVE rather than guessing — and INCONCLUSIVE returns every bond
+exactly, with no fee and no winner. Live LLM output is genuinely
+non-deterministic; this is the designed response to it, observed rather than
+argued.
+
+Viewable at https://non-omega.vercel.app/app.
 
 ## Not yet done
 
 - **`finalize` and `claim` have not run on chain.** The appeal window is six
   hours and its floor is deliberately not loosenable (an operator can only
-  make Non stricter), so the case must sit in `APPEAL_WINDOW` until it
-  expires. Every branch of the bond ledger is proven in gltest with value
-  conservation asserted, but no bond has actually been paid out on chain.
+  make Non stricter), so both cases must age out first. Every branch of the
+  bond ledger is proven in gltest with value conservation asserted, but no
+  bond has actually been paid out on chain yet.
+- **`expire_case` has not run on chain.** It requires a case to be stuck for
+  72 hours, which by construction cannot be demonstrated sooner. It is fully
+  covered in gltest, including that it refunds exactly, is permissionless,
+  and refuses to run on a decided-unchallenged or already-final case.
 - **`challenge` and re-evaluation have not run on chain**, for the same
-  reason.
-- **No adverse verdict has been produced live.** The one real case was
-  correctly approved, so REJECT, REVISE and INCONCLUSIVE have been exercised
-  only in gltest.
+  appeal-window reason.
+- **No adverse verdict has been produced live.** REJECT and REVISE have been
+  exercised only in gltest.
 
 ## Deploy notes for whoever runs it
 

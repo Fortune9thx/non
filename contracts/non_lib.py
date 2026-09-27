@@ -35,6 +35,14 @@ BPS_DENOMINATOR = 10_000
 
 APPEAL_WINDOW_SECONDS = 6 * 60 * 60  # 6 hours
 
+# A case that can never reach a verdict must still be able to release its
+# bonds. "Permissionlessly retriable" is not the same claim as
+# "guaranteed to converge": nothing bounds how long a genuinely ambiguous
+# case, or a validator-infrastructure problem, can make every attempt at
+# agreement fail. After this long with no reachable verdict, anyone may
+# expire the case and every bond is returned exactly.
+EXPIRY_SECONDS = 72 * 60 * 60  # 72 hours
+
 MAX_EVIDENCE_URLS = 8
 MIN_EVIDENCE_URLS = 1
 MAX_URL_LEN = 500
@@ -110,6 +118,8 @@ USER_ERRORS = {
     "ALREADY_FINAL": "case already final",
     "NOTHING_TO_CLAIM": "nothing to claim",
     "EVAL_FAILED": "evaluation failed",
+    "NOT_EXPIRED": "case not expired",
+    "NOT_EXPIRABLE": "case not expirable",
 }
 
 
@@ -166,7 +176,11 @@ def validate_identifier(raw, key: str = "BAD_SCOPE_ID") -> str:
 # Evidence URLs
 # ---------------------------------------------------------------------------
 
-_URL_RE = re.compile(r"^https://[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?::\d{2,5})?(?:/[^\s]*)?$")
+# No explicit port is accepted. A caller-supplied port lets evidence
+# fetches be aimed at non-standard services on hosts that would otherwise
+# look public, which is the part of the SSRF surface a hostname allowlist
+# alone does not cover.
+_URL_RE = re.compile(r"^https://[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?$")
 _DISALLOWED_HOST_RE = re.compile(
     r"^(?:localhost|127\.|10\.|192\.168\.|169\.254\.|0\.|\[?::1\]?|172\.(?:1[6-9]|2\d|3[01])\.)",
     re.IGNORECASE,
@@ -727,3 +741,74 @@ def case_state(rec: dict, now_ts: int, window_seconds: int = APPEAL_WINDOW_SECON
             return STATE_APPEAL_WINDOW
         return STATE_DECIDED
     return stored
+
+
+def expiry_deadline(rec: dict, expiry_seconds: int = EXPIRY_SECONDS) -> int:
+    """When a stuck case becomes expirable, or 0 if it is not the kind of
+    case that can be stuck.
+
+    Two states can stall with bonds held and no reachable verdict:
+
+    - ``OPEN``: every ``evaluate_case`` attempt fails to reach validator
+      agreement, so the case never gets a decision at all.
+    - ``DECIDED`` with a challenger still awaiting its second reading: the
+      re-evaluation cannot converge, and ``finalize`` deliberately refuses
+      to settle a challenged case on one round.
+
+    A decided, unchallenged case is NOT expirable -- once its appeal window
+    closes, ``finalize`` already settles it, so an expiry path there would
+    only be a way to dodge a resolved outcome.
+    """
+    state = rec.get("state")
+    if state == STATE_OPEN:
+        return int(rec.get("opened_at", 0)) + int(expiry_seconds)
+    if state == STATE_DECIDED and rec.get("challenger")             and int(rec.get("eval_rounds", 0)) < 2:
+        return int(rec.get("challenged_at", 0)) + int(expiry_seconds)
+    return 0
+
+
+def case_is_expirable(rec: dict, now_ts: int,
+                      expiry_seconds: int = EXPIRY_SECONDS) -> bool:
+    deadline = expiry_deadline(rec, expiry_seconds)
+    if deadline == 0:
+        return False
+    return int(now_ts) >= deadline
+
+
+def bind_envelope(agreed, case_id: str, rules_version: str, locked_urls) -> dict:
+    """Binds a consensus-agreed envelope to the case it is supposed to be
+    about, before any of it is believed.
+
+    A prompt asking for the right case id is not the same thing as code
+    checking the right case id came back, and an evidence record naming a
+    url this case never locked is not evidence about this case.
+
+    Any mismatch voids the WHOLE envelope rather than being filtered out of
+    it. Filtering and continuing would still let an extra fabricated entry
+    count toward the evidence-sufficiency gate that decides whether an
+    approval is permitted at all.
+
+    Returns {"bound": bool, "records": list}.
+    """
+    if not isinstance(agreed, dict):
+        return {"bound": False, "records": []}
+
+    if agreed.get("case_id") != case_id:
+        return {"bound": False, "records": []}
+    if agreed.get("rules_version") != rules_version:
+        return {"bound": False, "records": []}
+
+    raw = agreed.get("evidence")
+    if not isinstance(raw, list):
+        return {"bound": False, "records": []}
+
+    allowed = set(locked_urls)
+    records = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return {"bound": False, "records": []}
+        if entry.get("url") not in allowed:
+            return {"bound": False, "records": []}
+        records.append(entry)
+
+    return {"bound": True, "records": records}

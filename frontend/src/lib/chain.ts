@@ -133,6 +133,7 @@ export type Config = {
   min_challenge_bond: string;
   min_settle_bond: string;
   appeal_window_seconds: number;
+  expiry_seconds: number;
   protocol_fee_bps: number;
   max_evidence_urls: number;
   score_tolerance: number;
@@ -163,6 +164,8 @@ export type CaseRecord = {
   decided_at: number;
   finalized_at: number;
   appeal_deadline: number;
+  expiry_deadline: number;
+  expired?: boolean;
   review_bond: string;
   challenger: string;
   challenge_bond: string;
@@ -333,6 +336,109 @@ export type WriteArgs = {
   account: string;
 };
 
+/**
+ * Terminal transaction states that count as success.
+ *
+ * This is deliberately a WHITELIST of known-good values, never a blacklist
+ * of known-bad ones. A blacklist silently treats every state it has not
+ * heard of as success, which is exactly how an `UNDETERMINED` consensus
+ * outcome — where validators independently re-ran the work and disagreed,
+ * so nothing was persisted at all — gets reported to a user as a completed
+ * transaction.
+ */
+const OK_STATUS = new Set(["ACCEPTED", "FINALIZED"]);
+const OK_EXECUTION = new Set(["FINISHED_WITH_RETURN", "FINISHED_WITH_NO_RETURN"]);
+
+export type TxOutcome = {
+  hash: string;
+  status: string;
+  execution: string;
+  ok: boolean;
+  reason: string;
+};
+
+function readStatus(receipt: unknown): { status: string; execution: string } {
+  const r = (receipt ?? {}) as Record<string, unknown>;
+  const status = String(
+    r.statusName ?? r.status_name ?? r.status ?? ""
+  ).toUpperCase();
+  const execution = String(
+    r.txExecutionResultName ?? r.tx_execution_result_name ?? ""
+  ).toUpperCase();
+  return { status, execution };
+}
+
+/**
+ * Waits for a submitted transaction to reach a terminal state and reports
+ * whether it actually succeeded.
+ *
+ * `waitForTransactionReceipt` resolving without throwing is NOT proof the
+ * transaction reached the status that was asked for — it can resolve on a
+ * different terminal state — so the resolved receipt is always re-checked
+ * against the whitelist above.
+ */
+export async function waitForOutcome(
+  hash: string,
+  { finalized = false }: { finalized?: boolean } = {}
+): Promise<TxOutcome> {
+  const client = (await readClient()) as {
+    waitForTransactionReceipt: (a: unknown) => Promise<unknown>;
+  };
+
+  let receipt: unknown;
+  try {
+    receipt = await client.waitForTransactionReceipt({
+      hash,
+      status: finalized ? "FINALIZED" : "ACCEPTED",
+      retries: finalized ? 200 : 100,
+      interval: 5000,
+    });
+  } catch (err) {
+    return {
+      hash,
+      status: "",
+      execution: "",
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const { status, execution } = readStatus(receipt);
+  if (!OK_STATUS.has(status)) {
+    return {
+      hash,
+      status,
+      execution,
+      ok: false,
+      reason:
+        status === "UNDETERMINED"
+          ? "Validators could not agree, so nothing was recorded. Try again."
+          : `Transaction ended as ${status || "an unknown state"}.`,
+    };
+  }
+  if (execution && !OK_EXECUTION.has(execution)) {
+    return {
+      hash,
+      status,
+      execution,
+      ok: false,
+      reason: `The contract rejected this call (${execution}).`,
+    };
+  }
+  if (finalized && status !== "FINALIZED") {
+    return { hash, status, execution, ok: false, reason: "Not yet final." };
+  }
+  return { hash, status, execution, ok: true, reason: "" };
+}
+
+// ---------------------------------------------------------------------------
+// Writes
+//
+// Writes are submitted through genlayer-js, which owns calldata encoding and
+// the v0.6 transaction fee shape. The import is dynamic so a read-only
+// visitor never pays for the client bundle.
+// ---------------------------------------------------------------------------
+
 export async function writeContract({ method, args, value, account }: WriteArgs) {
   if (!CONTRACT_ADDRESS) throw new Error("no contract address configured");
   const provider = injectedProvider();
@@ -345,15 +451,19 @@ export async function writeContract({ method, args, value, account }: WriteArgs)
   ]);
 
   const chain = { ...studionet, id: CHAIN_ID, rpcUrls: { default: { http: [RPC_URL] } } };
+
+  // The wallet's own provider must be handed to the client, or there is
+  // nothing to sign with and every write fails.
   const client = createClient({
     chain: chain as never,
     account: account as never,
+    provider: provider as never,
   });
 
-  // Consensus v0.6 requires an explicit non-zero fee on every write. Let
-  // the client simulate this exact call to derive one rather than
-  // guessing a number; a partial fee distribution is rejected locally
-  // before broadcast and produces a confusing "reverted" message.
+  // Consensus v0.6 requires an explicit non-zero fee on every write. Let the
+  // client simulate this exact call to derive one rather than guessing: a
+  // partial fee distribution is rejected locally, before broadcast, with an
+  // error that reads like an on-chain revert.
   let fees: unknown = undefined;
   try {
     fees = await (client as never as {
@@ -378,7 +488,22 @@ export async function writeContract({ method, args, value, account }: WriteArgs)
     ...(fees ? { fees } : {}),
   });
 
-  return hash;
+  return hash as string;
+}
+
+/**
+ * Submits a write and waits for its real outcome.
+ *
+ * A returned transaction hash is a receipt of submission, not of success —
+ * every caller in this app goes through here so no UI can show a completed
+ * state off a hash alone.
+ */
+export async function submitWrite(
+  args: WriteArgs,
+  opts: { finalized?: boolean } = {}
+): Promise<TxOutcome> {
+  const hash = await writeContract(args);
+  return waitForOutcome(hash, opts);
 }
 
 // ---------------------------------------------------------------------------

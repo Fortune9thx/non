@@ -24,7 +24,6 @@ import non_lib as L  # noqa: E402
     "https://example.com",
     "https://docs.example.org/a/b?c=1",
     "https://sub.domain.example.co.uk/path",
-    "https://example.com:8443/x",
 ])
 def test_valid_urls_accepted(url):
     assert L.validate_url(url) == url
@@ -472,3 +471,149 @@ def test_normalize_handles_undecodable_bytes_and_none():
     rec = L.normalize_evidence("https://a.com/r", 200, b"<p>\xff\xfe bad</p>")
     assert rec["ok"] is True  # replaced, not crashed
     assert L.normalize_evidence("https://a.com/r", 200, None)["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# Bounded liveness escape hatch
+#
+# "Permissionlessly retriable" is not "guaranteed to converge" -- a case whose
+# evaluation never reaches validator agreement would otherwise hold its bonds
+# forever.
+# ---------------------------------------------------------------------------
+
+T0 = 1_000_000
+
+
+def _open_rec(**kw):
+    rec = {"state": L.STATE_OPEN, "opened_at": T0, "challenger": "",
+           "eval_rounds": 0, "challenged_at": 0}
+    rec.update(kw)
+    return rec
+
+
+def test_open_case_expires_after_the_window():
+    rec = _open_rec()
+    assert L.expiry_deadline(rec) == T0 + L.EXPIRY_SECONDS
+    assert not L.case_is_expirable(rec, T0 + L.EXPIRY_SECONDS - 1)
+    assert L.case_is_expirable(rec, T0 + L.EXPIRY_SECONDS)
+
+
+def test_challenged_case_awaiting_its_second_reading_expires():
+    rec = _open_rec(state=L.STATE_DECIDED, challenger="0xc",
+                    eval_rounds=1, challenged_at=T0)
+    assert L.expiry_deadline(rec) == T0 + L.EXPIRY_SECONDS
+    assert L.case_is_expirable(rec, T0 + L.EXPIRY_SECONDS)
+
+
+def test_decided_unchallenged_case_is_never_expirable():
+    """finalize already settles it once the appeal window closes, so an
+    expiry path here would only be a way to dodge a resolved outcome."""
+    rec = _open_rec(state=L.STATE_DECIDED, decided_at=T0)
+    assert L.expiry_deadline(rec) == 0
+    assert not L.case_is_expirable(rec, T0 + 10 * L.EXPIRY_SECONDS)
+
+
+def test_re_evaluated_challenged_case_is_never_expirable():
+    """Once the second reading has happened, finalize can settle it."""
+    rec = _open_rec(state=L.STATE_DECIDED, challenger="0xc",
+                    eval_rounds=2, challenged_at=T0)
+    assert L.expiry_deadline(rec) == 0
+
+
+def test_final_case_is_never_expirable():
+    assert L.expiry_deadline({"state": L.STATE_FINAL}) == 0
+
+
+def test_expiry_refunds_every_bond_exactly():
+    """The expiry path settles as INCONCLUSIVE: exact refunds, no fee."""
+    r = L.settle_accounting(decision=L.DECISION_INCONCLUSIVE, proposer=PROPOSER,
+                            review_bond=RB, challenger=CHALLENGER,
+                            challenge_bond=CB, treasury=TREASURY)
+    assert r["credits"][PROPOSER] == RB
+    assert r["credits"][CHALLENGER] == CB
+    assert TREASURY not in r["credits"]
+    assert r["total"] == RB + CB
+
+
+def test_explicit_ports_are_rejected():
+    """A caller-supplied port aims evidence fetches at non-standard services
+    on hosts a hostname allowlist would otherwise accept."""
+    for url in ["https://example.com:8443/x", "https://example.com:80/",
+                "https://example.com:22/"]:
+        with pytest.raises(L.NonValidationError):
+            L.validate_url(url)
+
+
+# ---------------------------------------------------------------------------
+# Envelope binding: the verdict must be about THIS case, citing THIS case's
+# own locked evidence.
+# ---------------------------------------------------------------------------
+
+LOCKED = ["https://a.com/1", "https://b.com/2"]
+
+
+def _envelope(**kw):
+    env = {
+        "case_id": "NON-000001",
+        "rules_version": "v1.0",
+        "evidence": [{"url": "https://a.com/1", "ok": True}],
+    }
+    env.update(kw)
+    return env
+
+
+def _bind(env):
+    return L.bind_envelope(env, "NON-000001", "v1.0", LOCKED)
+
+
+def test_binding_accepts_a_faithful_envelope():
+    out = _bind(_envelope())
+    assert out["bound"] is True
+    assert len(out["records"]) == 1
+
+
+def test_binding_rejects_a_verdict_about_another_case():
+    assert _bind(_envelope(case_id="NON-999999"))["bound"] is False
+    assert _bind(_envelope(case_id=None))["bound"] is False
+
+
+def test_binding_rejects_another_rules_version():
+    assert _bind(_envelope(rules_version="v2.0"))["bound"] is False
+
+
+def test_binding_rejects_evidence_citing_an_unlocked_url():
+    """The whole envelope is voided, not filtered -- otherwise a fabricated
+    entry could still reach the evidence-sufficiency gate."""
+    env = _envelope(evidence=[
+        {"url": "https://a.com/1", "ok": False},
+        {"url": "https://evil.com/x", "ok": True},   # never locked
+    ])
+    out = _bind(env)
+    assert out["bound"] is False
+    assert out["records"] == []
+
+
+def test_binding_void_cannot_smuggle_an_approval():
+    """An envelope voided by a foreign url must not be able to approve: the
+    caller canonicalizes with evidence_ok=False, which forces inconclusive."""
+    env = _envelope(decision="approve", outcome="approved",
+                    evidence=[{"url": "https://evil.com/x", "ok": True}])
+    assert _bind(env)["bound"] is False
+    assert L.canonicalize_verdict(env, evidence_ok=False)["decision"] == "inconclusive"
+
+
+def test_binding_rejects_malformed_evidence():
+    for bad in [None, "not a list", [1, 2], [{"no_url": True}]]:
+        assert _bind(_envelope(evidence=bad))["bound"] is False
+
+
+def test_binding_rejects_a_non_object_envelope():
+    for bad in [None, "text", [1, 2]]:
+        assert L.bind_envelope(bad, "NON-000001", "v1.0", LOCKED)["bound"] is False
+
+
+def test_binding_allows_a_subset_of_locked_urls():
+    """A fetch that produced fewer rows than locked urls is still faithful --
+    only citing a url that was never locked is not."""
+    out = _bind(_envelope(evidence=[]))
+    assert out["bound"] is True and out["records"] == []

@@ -13,6 +13,7 @@ MIN_SETTLE_BOND = 1 * GEN
 PROTOCOL_FEE_BPS = 200
 BPS_DENOMINATOR = 10000
 APPEAL_WINDOW_SECONDS = 6 * 60 * 60
+EXPIRY_SECONDS = 72 * 60 * 60
 MAX_EVIDENCE_URLS = 8
 MIN_EVIDENCE_URLS = 1
 MAX_URL_LEN = 500
@@ -37,7 +38,7 @@ STATE_REVIEWING = 'REVIEWING'
 STATE_DECIDED = 'DECIDED'
 STATE_APPEAL_WINDOW = 'APPEAL_WINDOW'
 STATE_FINAL = 'FINAL'
-USER_ERRORS = {'SCOPE_EXISTS': 'scope exists', 'SCOPE_MISSING': 'scope missing', 'NOT_SCOPE_ADMIN': 'not scope admin', 'CONSTITUTION_MISSING': 'constitution missing', 'CASE_MISSING': 'case missing', 'BOND_TOO_LOW': 'bond too low', 'BAD_SUBJECT': 'bad subject', 'BAD_URLS': 'bad urls', 'BAD_VERSION': 'bad version', 'BAD_RULES': 'bad rules', 'BAD_SCOPE_ID': 'bad scope id', 'NOT_OPEN': 'case not open', 'ALREADY_DECIDED': 'case already decided', 'APPEAL_CLOSED': 'appeal closed', 'APPEAL_OPEN': 'appeal open', 'ALREADY_CHALLENGED': 'already challenged', 'SELF_CHALLENGE': 'proposer cannot challenge', 'NOT_DECIDED': 'case not decided', 'NOT_FINAL': 'case not final', 'ALREADY_FINAL': 'case already final', 'NOTHING_TO_CLAIM': 'nothing to claim', 'EVAL_FAILED': 'evaluation failed'}
+USER_ERRORS = {'SCOPE_EXISTS': 'scope exists', 'SCOPE_MISSING': 'scope missing', 'NOT_SCOPE_ADMIN': 'not scope admin', 'CONSTITUTION_MISSING': 'constitution missing', 'CASE_MISSING': 'case missing', 'BOND_TOO_LOW': 'bond too low', 'BAD_SUBJECT': 'bad subject', 'BAD_URLS': 'bad urls', 'BAD_VERSION': 'bad version', 'BAD_RULES': 'bad rules', 'BAD_SCOPE_ID': 'bad scope id', 'NOT_OPEN': 'case not open', 'ALREADY_DECIDED': 'case already decided', 'APPEAL_CLOSED': 'appeal closed', 'APPEAL_OPEN': 'appeal open', 'ALREADY_CHALLENGED': 'already challenged', 'SELF_CHALLENGE': 'proposer cannot challenge', 'NOT_DECIDED': 'case not decided', 'NOT_FINAL': 'case not final', 'ALREADY_FINAL': 'case already final', 'NOTHING_TO_CLAIM': 'nothing to claim', 'EVAL_FAILED': 'evaluation failed', 'NOT_EXPIRED': 'case not expired', 'NOT_EXPIRABLE': 'case not expirable'}
 
 class NonValidationError(Exception):
 
@@ -71,7 +72,7 @@ def validate_identifier(raw, key: str='BAD_SCOPE_ID') -> str:
     if not _ID_RE.match(ident):
         _fail(key)
     return ident
-_URL_RE = re.compile('^https://[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?::\\d{2,5})?(?:/[^\\s]*)?$')
+_URL_RE = re.compile('^https://[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?:/[^\\s]*)?$')
 _DISALLOWED_HOST_RE = re.compile('^(?:localhost|127\\.|10\\.|192\\.168\\.|169\\.254\\.|0\\.|\\[?::1\\]?|172\\.(?:1[6-9]|2\\d|3[01])\\.)', re.IGNORECASE)
 
 def _host_of(url: str) -> str:
@@ -389,6 +390,40 @@ def case_state(rec: dict, now_ts: int, window_seconds: int=APPEAL_WINDOW_SECONDS
         return STATE_DECIDED
     return stored
 
+def expiry_deadline(rec: dict, expiry_seconds: int=EXPIRY_SECONDS) -> int:
+    state = rec.get('state')
+    if state == STATE_OPEN:
+        return int(rec.get('opened_at', 0)) + int(expiry_seconds)
+    if state == STATE_DECIDED and rec.get('challenger') and (int(rec.get('eval_rounds', 0)) < 2):
+        return int(rec.get('challenged_at', 0)) + int(expiry_seconds)
+    return 0
+
+def case_is_expirable(rec: dict, now_ts: int, expiry_seconds: int=EXPIRY_SECONDS) -> bool:
+    deadline = expiry_deadline(rec, expiry_seconds)
+    if deadline == 0:
+        return False
+    return int(now_ts) >= deadline
+
+def bind_envelope(agreed, case_id: str, rules_version: str, locked_urls) -> dict:
+    if not isinstance(agreed, dict):
+        return {'bound': False, 'records': []}
+    if agreed.get('case_id') != case_id:
+        return {'bound': False, 'records': []}
+    if agreed.get('rules_version') != rules_version:
+        return {'bound': False, 'records': []}
+    raw = agreed.get('evidence')
+    if not isinstance(raw, list):
+        return {'bound': False, 'records': []}
+    allowed = set(locked_urls)
+    records = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return {'bound': False, 'records': []}
+        if entry.get('url') not in allowed:
+            return {'bound': False, 'records': []}
+        records.append(entry)
+    return {'bound': True, 'records': records}
+
 def _now_ts() -> int:
     return int(datetime.now(timezone.utc).timestamp())
 
@@ -436,6 +471,11 @@ class CaseFinalized(gl.chain.Event):
     def __init__(self, case_id: str, decision: str, /):
         ...
 
+class CaseExpired(gl.chain.Event):
+
+    def __init__(self, case_id: str, /):
+        ...
+
 class Claimed(gl.chain.Event):
 
     def __init__(self, amount: u256, claimant: Address, /):
@@ -454,6 +494,7 @@ class Non(gl.contract.Contract):
     min_challenge_bond: u256
     min_settle_bond: u256
     appeal_window: u256
+    expiry_window: u256
     protocol_fee_bps: u256
 
     def __init__(self, treasury: str, appeal_window_seconds: str='', min_review_bond: str='', min_challenge_bond: str='', min_settle_bond: str=''):
@@ -463,6 +504,7 @@ class Non(gl.contract.Contract):
         self.min_challenge_bond = u256(_floor_config(min_challenge_bond, MIN_CHALLENGE_BOND))
         self.min_settle_bond = u256(_floor_config(min_settle_bond, MIN_SETTLE_BOND))
         self.appeal_window = u256(_floor_config(appeal_window_seconds, APPEAL_WINDOW_SECONDS))
+        self.expiry_window = u256(EXPIRY_SECONDS)
         self.protocol_fee_bps = u256(PROTOCOL_FEE_BPS)
 
     def _load_scope(self, scope_id: str) -> dict:
@@ -574,6 +616,8 @@ class Non(gl.contract.Contract):
         rules_text = rec['rules_text']
         rules_json = rec['rules_json']
         challenge_note = rec.get('challenge_note', '')
+        case_id_local = case_id
+        locked_urls = set(urls)
 
         def leader_fn() -> str:
             records = []
@@ -598,6 +642,7 @@ class Non(gl.contract.Contract):
                 except Exception:
                     raw = ''
                 verdict = canonicalize_verdict(raw, evidence_ok=evidence_ok)
+            verdict['case_id'] = case_id_local
             verdict['rules_version'] = rules_version
             verdict['evidence'] = [{'url': r['url'], 'status': r['status'], 'ok': r['ok'], 'title': r['title'], 'limitations': r['limitations']} for r in records]
             return json.dumps(verdict, sort_keys=True)
@@ -613,6 +658,8 @@ class Non(gl.contract.Contract):
             if not isinstance(leader_verdict, dict):
                 return False
             mine = json.loads(leader_fn())
+            if leader_verdict.get('case_id') != case_id_local:
+                return False
             return verdicts_equivalent(leader_verdict, mine, rules_version_match=leader_verdict.get('rules_version') == mine.get('rules_version'))
         raw_result = gl.vm.run_nondet(leader_fn, validator_fn)
         try:
@@ -621,11 +668,12 @@ class Non(gl.contract.Contract):
             agreed = {}
         if not isinstance(agreed, dict):
             agreed = {}
-        evidence_records = agreed.get('evidence', [])
-        evidence_ok = any((bool(e.get('ok')) for e in evidence_records)) if isinstance(evidence_records, list) else False
-        verdict = canonicalize_verdict(agreed, evidence_ok=evidence_ok)
-        if agreed.get('rules_version') and agreed['rules_version'] != rules_version:
+        binding = bind_envelope(agreed, case_id, rules_version, locked_urls)
+        evidence_records = binding['records']
+        if not binding['bound']:
             verdict = canonicalize_verdict({}, evidence_ok=False)
+        else:
+            verdict = canonicalize_verdict(agreed, evidence_ok=any((bool(e.get('ok')) for e in evidence_records)))
         rec = self._load_case(case_id)
         rec['decision'] = verdict['decision']
         rec['outcome'] = verdict['outcome']
@@ -635,7 +683,7 @@ class Non(gl.contract.Contract):
         rec['corrections'] = verdict['corrections']
         rec['improvements'] = verdict['improvements']
         rec['uncertainty'] = verdict['uncertainty']
-        rec['evidence_report'] = evidence_records if isinstance(evidence_records, list) else []
+        rec['evidence_report'] = evidence_records
         rec['state'] = STATE_DECIDED
         rec['decided_at'] = now_ts
         rec['eval_rounds'] = int(rec.get('eval_rounds', 0)) + 1
@@ -701,6 +749,30 @@ class Non(gl.contract.Contract):
         return rec['decision']
 
     @gl.public.write
+    def expire_case(self, case_id: str) -> str:
+        rec = self._load_case(case_id)
+        now_ts = _now_ts()
+        if rec['state'] == STATE_FINAL:
+            raise gl.vm.UserError(USER_ERRORS['ALREADY_FINAL'])
+        if expiry_deadline(rec, int(self.expiry_window)) == 0:
+            raise gl.vm.UserError(USER_ERRORS['NOT_EXPIRABLE'])
+        if not case_is_expirable(rec, now_ts, int(self.expiry_window)):
+            raise gl.vm.UserError(USER_ERRORS['NOT_EXPIRED'])
+        accounting = settle_accounting(decision=DECISION_INCONCLUSIVE, proposer=rec['proposer'], review_bond=int(rec['review_bond']), challenger=rec['challenger'], challenge_bond=int(rec['challenge_bond']), treasury=self.treasury)
+        for addr, amount in accounting['credits'].items():
+            self._credit(addr, amount)
+        rec['decision'] = DECISION_INCONCLUSIVE
+        rec['outcome'] = OUTCOME_FOR_DECISION[DECISION_INCONCLUSIVE]
+        rec['uncertainty'] = 'expired without a reachable verdict; bonds returned'
+        rec['state'] = STATE_FINAL
+        rec['finalized_at'] = now_ts
+        rec['expired'] = True
+        rec['settled'] = True
+        self._save_case(case_id, rec)
+        CaseExpired(case_id).emit()
+        return DECISION_INCONCLUSIVE
+
+    @gl.public.write
     def claim(self) -> u256:
         sender = Address(_sender()).as_hex
         owed = int(self.claimable.get(sender, u256(0)))
@@ -713,7 +785,7 @@ class Non(gl.contract.Contract):
 
     @gl.public.view
     def get_config(self) -> str:
-        return json.dumps({'treasury': self.treasury, 'owner': self.owner, 'min_review_bond': str(int(self.min_review_bond)), 'min_challenge_bond': str(int(self.min_challenge_bond)), 'min_settle_bond': str(int(self.min_settle_bond)), 'appeal_window_seconds': int(self.appeal_window), 'protocol_fee_bps': int(self.protocol_fee_bps), 'max_evidence_urls': MAX_EVIDENCE_URLS, 'score_tolerance': SCORE_TOLERANCE, 'decisions': list(DECISIONS), 'case_count': int(self.case_counter)})
+        return json.dumps({'treasury': self.treasury, 'owner': self.owner, 'min_review_bond': str(int(self.min_review_bond)), 'min_challenge_bond': str(int(self.min_challenge_bond)), 'min_settle_bond': str(int(self.min_settle_bond)), 'appeal_window_seconds': int(self.appeal_window), 'expiry_seconds': int(self.expiry_window), 'protocol_fee_bps': int(self.protocol_fee_bps), 'max_evidence_urls': MAX_EVIDENCE_URLS, 'score_tolerance': SCORE_TOLERANCE, 'decisions': list(DECISIONS), 'case_count': int(self.case_counter)})
 
     @gl.public.view
     def get_constitution(self, scope_id: str) -> str:
@@ -725,6 +797,7 @@ class Non(gl.contract.Contract):
         rec = self._load_case(case_id)
         rec['derived_state'] = case_state(rec, _now_ts(), int(self.appeal_window))
         rec['appeal_deadline'] = appeal_deadline(rec['decided_at'], int(self.appeal_window)) if rec['decided_at'] else 0
+        rec['expiry_deadline'] = expiry_deadline(rec, int(self.expiry_window))
         return json.dumps(rec)
 
     @gl.public.view

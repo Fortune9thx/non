@@ -1,0 +1,13 @@
+# The deployable contract is parsed by GenVM's runner-comment reader, which
+# reads the first line of the file. Committed contract sources are kept
+# LF-only so every checkout — and every deploy path, including a manual CLI
+# deploy or a Studio paste from a Windows working copy — sees the same bytes.
+*.py text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf

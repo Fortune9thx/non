@@ -64,7 +64,7 @@ after a clean deploy, fixed and redeployed.**
 
 The first deploy was live and healthy, but `open_case` aborted on chain with
 `SystemError: 2: inval` inside `Event.emit_raw`. Two distinct SDK rules were
-being violated, and **gltest direct-mode reproduces neither** — all 128 tests
+being violated, and **gltest direct-mode reproduces neither** — all 170 tests
 passed against the broken code.
 
 **a. The topic budget counts the signature.** `ABI.EVENT_MAX_TOPICS` is 4, and
@@ -103,6 +103,93 @@ Both were real, not lint noise: the second would have shipped a block the
 platform's own tooling could not verify.
 
 ---
+
+## Strict pre-submission audit round
+
+A second, deliberately adversarial pass was run against a 188-item checklist
+compiled from real GenLayer Portal steward rejections. It produced four code
+findings, all fixed and redeployed.
+
+### 4. No bounded escape hatch if evaluation never converges
+
+**Severity: high — this exact reasoning has caused a real steward rejection
+before.**
+
+Non's own earlier audit argued that no timeout was needed because
+`evaluate_case`, `finalize` and `claim` are all permissionless, so a proposer
+can always move their own case along. That argument is wrong, and it is wrong
+in a way a steward has already rejected on another project: **"permissionlessly
+retriable" is not the same claim as "guaranteed to converge."** Nothing bounds
+how long a genuinely ambiguous case, or a validator-infrastructure problem,
+can make every attempt at agreement fail — and for as long as that lasts, the
+bonds sit locked with no way out.
+
+Added `expire_case`: after 72 hours with no reachable verdict, anyone may
+expire the case and every bond is returned exactly, with no fee and no winner.
+It cannot run on a FINAL case, and it cannot run on a decided, unchallenged
+case — that one simply needs its appeal window to close before `finalize`
+settles it — so it can never be used to dodge a resolved forfeiture. It covers
+both states that can genuinely stall: an `OPEN` case that never gets a
+decision, and a challenged case whose second reading never converges.
+
+### 5. The agreed verdict was not bound to the case it was about
+
+**Severity: medium-high.** The envelope carried no case id, and the stored
+evidence report was copied verbatim from the leader with no check that its
+URLs were the ones this case actually locked. Worse, `evidence_ok` — the gate
+that decides whether an APPROVE is permitted at all — was computed from that
+unchecked list.
+
+Consensus still protected the *decision* (a validator re-deriving from the
+case's own locked inputs would not match a foreign verdict), but a prompt
+asking for the right case id is not the same thing as code checking the right
+case id came back. `bind_envelope` now verifies the case id, the rules
+version, and that every evidence row names a locked URL — voiding the **whole**
+envelope on any mismatch rather than filtering it, so a fabricated "ok" row
+can never reach the evidence-sufficiency gate.
+
+### 6. The frontend write path could not sign at all
+
+**Severity: high (every write broken).** `writeContract` fetched the injected
+provider, null-checked it, and then never passed it to `createClient` — so the
+client had no signer. This had never been caught because no browser write had
+ever been exercised against a live contract.
+
+### 7. Success was shown from a transaction hash alone
+
+**Severity: medium.** Every action rendered a success banner as soon as
+`writeContract` returned a hash, with no polling and no status check. A hash is
+a receipt of submission, not of success: an `UNDETERMINED` consensus outcome —
+validators independently re-ran the work and disagreed, so nothing was
+persisted — would have been shown to the user as a completed action.
+
+Every write now goes through `submitWrite`, which waits for a terminal state
+and checks it against a **whitelist** of known-good values, never a blacklist
+of known-bad ones. A blacklist silently treats every state it has not heard of
+as success.
+
+### Also tightened
+
+- **SSRF:** explicit ports are now rejected. Literal IPv4/IPv6 and
+  numeric-encoded hosts were already structurally refused by the hostname
+  rule, but a port let a fetch be aimed at a non-standard service on a host
+  that otherwise looks public.
+- **`.gitattributes` + a CI check** keep contract sources LF-only. (The
+  sources were already LF; this prevents drift rather than fixing a defect.)
+- **CI now has a real lint gate.** `genvm-lint lint` — the SDK-free AST half
+  of `check` — runs in the must-pass job.
+
+### Checked and found already correct
+
+Verified against the checklist rather than assumed: the read client is a
+memoized singleton that never creates an ephemeral account; address keys are
+normalized identically at write and lookup; every bond collected has a
+resolution on every exit path, with conservation asserted; `claim()` — the
+only value-moving call — is genuinely exercised by tests; every `str` field
+reaching a prompt is length-capped at the write that stores it; both the
+challenge-opening and finalize paths independently re-check the appeal window;
+self-dealing is rejected; no float ever reaches calldata; and the header is a
+bare `Depends` comment on line 1.
 
 ## Deliberate design decisions
 
@@ -207,7 +294,7 @@ canonical outcomes, and cannot move money without a second node agreeing.
 ## Known limits and unproven claims
 
 1. **A full case has not been settled on chain.** The contract is live at
-   `0xb263b7E8972D243639F797948A3322cE1Ca657dc` and one real case, `NON-000001`, was opened with a 2 GEN bond and
+   `0xfc34Ce61034952807899B8abE172BF76cC6036a0` and one real case, `NON-000001`, was opened with a 2 GEN bond and
    adjudicated live — real HTTPS fetches, a real prompt, and validator
    consensus. What has *not* run on chain is `finalize` and `claim`: the
    appeal window is six hours and its floor is deliberately not loosenable, so

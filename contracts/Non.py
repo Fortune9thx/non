@@ -125,6 +125,10 @@ class CaseFinalized(gl.chain.Event):
     def __init__(self, case_id: str, decision: str, /): ...
 
 
+class CaseExpired(gl.chain.Event):
+    def __init__(self, case_id: str, /): ...
+
+
 class Claimed(gl.chain.Event):
     def __init__(self, amount: u256, claimant: Address, /): ...
 
@@ -147,6 +151,7 @@ class Non(gl.contract.Contract):
     min_challenge_bond: u256
     min_settle_bond: u256
     appeal_window: u256
+    expiry_window: u256
     protocol_fee_bps: u256
 
     def __init__(self, treasury: str, appeal_window_seconds: str = "",
@@ -167,6 +172,7 @@ class Non(gl.contract.Contract):
         self.min_challenge_bond = u256(_floor_config(min_challenge_bond, MIN_CHALLENGE_BOND))
         self.min_settle_bond = u256(_floor_config(min_settle_bond, MIN_SETTLE_BOND))
         self.appeal_window = u256(_floor_config(appeal_window_seconds, APPEAL_WINDOW_SECONDS))
+        self.expiry_window = u256(EXPIRY_SECONDS)
         self.protocol_fee_bps = u256(PROTOCOL_FEE_BPS)
 
     # -----------------------------------------------------------------
@@ -366,6 +372,8 @@ class Non(gl.contract.Contract):
         rules_text = rec["rules_text"]
         rules_json = rec["rules_json"]
         challenge_note = rec.get("challenge_note", "")
+        case_id_local = case_id
+        locked_urls = set(urls)
 
         def leader_fn() -> str:
             """Fetches every evidence url over HTTPS, normalizes each page
@@ -410,6 +418,7 @@ class Non(gl.contract.Contract):
                     raw = ""
                 verdict = canonicalize_verdict(raw, evidence_ok=evidence_ok)
 
+            verdict["case_id"] = case_id_local
             verdict["rules_version"] = rules_version
             verdict["evidence"] = [{
                 "url": r["url"],
@@ -442,6 +451,8 @@ class Non(gl.contract.Contract):
                 return False
 
             mine = json.loads(leader_fn())
+            if leader_verdict.get("case_id") != case_id_local:
+                return False  # a verdict about another case is not a verdict
             return verdicts_equivalent(
                 leader_verdict,
                 mine,
@@ -462,15 +473,17 @@ class Non(gl.contract.Contract):
         # Re-canonicalize the agreed result inside deterministic code. Even
         # a consensus-accepted envelope is re-run through the same pure
         # mapping before it is allowed to touch stored state.
-        evidence_records = agreed.get("evidence", [])
-        evidence_ok = any(bool(e.get("ok")) for e in evidence_records) \
-            if isinstance(evidence_records, list) else False
-        verdict = canonicalize_verdict(agreed, evidence_ok=evidence_ok)
-
-        if agreed.get("rules_version") and agreed["rules_version"] != rules_version:
-            # A verdict reached under a different rules version is not a
-            # verdict about this case.
+        # Bind the agreed envelope to THIS case before any of it is
+        # believed -- see non_lib.bind_envelope for the full rule.
+        binding = bind_envelope(agreed, case_id, rules_version, locked_urls)
+        evidence_records = binding["records"]
+        if not binding["bound"]:
             verdict = canonicalize_verdict({}, evidence_ok=False)
+        else:
+            verdict = canonicalize_verdict(
+                agreed,
+                evidence_ok=any(bool(e.get("ok")) for e in evidence_records),
+            )
 
         rec = self._load_case(case_id)
         rec["decision"] = verdict["decision"]
@@ -485,7 +498,7 @@ class Non(gl.contract.Contract):
         rec["corrections"] = verdict["corrections"]
         rec["improvements"] = verdict["improvements"]
         rec["uncertainty"] = verdict["uncertainty"]
-        rec["evidence_report"] = evidence_records if isinstance(evidence_records, list) else []
+        rec["evidence_report"] = evidence_records
         rec["state"] = STATE_DECIDED
         rec["decided_at"] = now_ts
         rec["eval_rounds"] = int(rec.get("eval_rounds", 0)) + 1
@@ -599,6 +612,59 @@ class Non(gl.contract.Contract):
         return rec["decision"]
 
     # -----------------------------------------------------------------
+    # expire_case -- bounded liveness escape hatch
+    # -----------------------------------------------------------------
+
+    @gl.public.write
+    def expire_case(self, case_id: str) -> str:
+        """Releases the bonds of a case that can never reach a verdict.
+
+        `evaluate_case` being permissionless makes it retriable; it does not
+        make it guaranteed to converge. A genuinely ambiguous case, or a
+        validator-infrastructure problem, can make every attempt at
+        agreement fail indefinitely, and the bonds would sit locked forever.
+
+        After the expiry window this path returns every bond exactly once,
+        with no fee and no winner -- the same accounting as INCONCLUSIVE. It
+        is permissionless, it cannot run once a case is FINAL, and it cannot
+        run on a decided, unchallenged case (whose appeal window simply
+        needs to close before `finalize` settles it), so it can never be
+        used to dodge a resolved outcome.
+        """
+        rec = self._load_case(case_id)
+        now_ts = _now_ts()
+
+        if rec["state"] == STATE_FINAL:
+            raise gl.vm.UserError(USER_ERRORS["ALREADY_FINAL"])
+        if expiry_deadline(rec, int(self.expiry_window)) == 0:
+            raise gl.vm.UserError(USER_ERRORS["NOT_EXPIRABLE"])
+        if not case_is_expirable(rec, now_ts, int(self.expiry_window)):
+            raise gl.vm.UserError(USER_ERRORS["NOT_EXPIRED"])
+
+        accounting = settle_accounting(
+            decision=DECISION_INCONCLUSIVE,
+            proposer=rec["proposer"],
+            review_bond=int(rec["review_bond"]),
+            challenger=rec["challenger"],
+            challenge_bond=int(rec["challenge_bond"]),
+            treasury=self.treasury,
+        )
+        for addr, amount in accounting["credits"].items():
+            self._credit(addr, amount)
+
+        rec["decision"] = DECISION_INCONCLUSIVE
+        rec["outcome"] = OUTCOME_FOR_DECISION[DECISION_INCONCLUSIVE]
+        rec["uncertainty"] = "expired without a reachable verdict; bonds returned"
+        rec["state"] = STATE_FINAL
+        rec["finalized_at"] = now_ts
+        rec["expired"] = True
+        rec["settled"] = True
+        self._save_case(case_id, rec)
+
+        CaseExpired(case_id).emit()
+        return DECISION_INCONCLUSIVE
+
+    # -----------------------------------------------------------------
     # claim
     # -----------------------------------------------------------------
 
@@ -631,6 +697,7 @@ class Non(gl.contract.Contract):
             "min_challenge_bond": str(int(self.min_challenge_bond)),
             "min_settle_bond": str(int(self.min_settle_bond)),
             "appeal_window_seconds": int(self.appeal_window),
+            "expiry_seconds": int(self.expiry_window),
             "protocol_fee_bps": int(self.protocol_fee_bps),
             "max_evidence_urls": MAX_EVIDENCE_URLS,
             "score_tolerance": SCORE_TOLERANCE,
@@ -654,6 +721,7 @@ class Non(gl.contract.Contract):
         rec["appeal_deadline"] = appeal_deadline(
             rec["decided_at"], int(self.appeal_window)
         ) if rec["decided_at"] else 0
+        rec["expiry_deadline"] = expiry_deadline(rec, int(self.expiry_window))
         return json.dumps(rec)
 
     @gl.public.view
