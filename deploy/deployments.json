@@ -4,10 +4,15 @@
     "chain_id": 61997,
     "rpc": "https://studio-dev.genlayer.com/api",
     "explorer": "https://explorer-studio-dev.genlayer.com",
-    "address": "0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76",
-    "deploy_tx": "0x4ca5244a86e67d3606dc93e74fafda59c67b9acb50a0527fc5c69276e8ec2311",
+    "address": "0xb263b7E8972D243639F797948A3322cE1Ca657dc",
+    "deploy_tx": "0xb551f25c47e3bf0320c948853a3068810f2c8bc31c86a139564d17c9402f5bd9",
     "treasury": "0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537",
+    "app": "https://non-omega.vercel.app",
     "verified_live_at": "2026-09-27",
-    "verified_by": "gen_getContractSchema returned 14 methods; get_config returned the expected protocol constants"
+    "verified_by": "gen_getContractSchema returned 14 methods; a real bonded case (NON-000001) was opened, adjudicated live and rendered by the app",
+    "superseded": {
+      "address": "0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76",
+      "reason": "CaseOpened declared 4 indexed event fields; ABI.EVENT_MAX_TOPICS is 4 INCLUDING the signature topic, so open_case aborted on chain with SystemError: 2: inval. Fixed and redeployed."
+    }
   }
 }

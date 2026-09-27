@@ -6,7 +6,7 @@ Non is a bonded constitutional tribunal on GenLayer. Validators independently
 re-fetch HTTPS evidence and decide whether a proposal satisfies a pinned
 constitution. Outcomes are APPROVE, REJECT, REVISE, or INCONCLUSIVE. Proposer
 and challenger bonds make false verdicts costly. INCONCLUSIVE refunds bonds
-exactly. Live at `0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76` on chain 61997 Studio Next; state may reset.
+exactly. Live at `0xb263b7E8972D243639F797948A3322cE1Ca657dc` on chain 61997 Studio Next; state may reset.
 
 ## The contested claim
 
@@ -51,16 +51,20 @@ One-way, toward the outcome that moves no money.
 ## Status
 
 **Live on Studio Next (chain 61997)** at
-[`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76), verified by `gen_getContractSchema` and a
+[`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc), verified by `gen_getContractSchema` and a
 real on-chain `get_config` read.
 
-What is **not** yet proven on chain: no case has been opened, because
-`open_case`, `challenge` and `finalize` are payable and `genlayer write`
-cannot attach native GEN. The full case lifecycle — all four outcomes, the
-appeal window, and every branch of the bond ledger — is proven in gltest
-direct-mode against a real GenVM sandbox. See [`STATUS.md`](STATUS.md) for the
-exact five-step on-chain smoke test that was run, and for what it does not
-cover.
+One real case, **NON-000001**, has been opened with a 2 GEN bond and
+adjudicated live: both evidence URLs fetched over HTTPS, a real prompt run,
+and validator consensus reached on an **APPROVE**. It is viewable at
+https://non-omega.vercel.app/app/cases/NON-000001.
+
+What is **not** yet proven on chain: `finalize` and `claim`, because the
+six-hour appeal window's floor is deliberately not loosenable, so no bond has
+actually been paid out yet. Challenge, re-evaluation, and the three adverse
+outcomes are likewise gltest-only so far. Every branch of the bond ledger is
+proven there with value conservation asserted. See [`STATUS.md`](STATUS.md)
+for exactly what was run and what it does not cover.
 
 ## Evidence for review
 
@@ -68,11 +72,11 @@ cover.
 | --- | --- |
 | Source | `contracts/non_lib.py`, `contracts/Non.py` |
 | Deployable bundle | `build/Non.bundled.py` — `Depends` on line 1, no prose above it |
-| Tests | 128 passing — `python -m pytest tests -q` |
+| Tests | 144 passing — `python -m pytest tests -q` |
 | Lint | `genvm-lint check build/Non.bundled.py` — clean |
 | Architecture | [`architecture.md`](architecture.md) |
 | Self-audit | [`audit.md`](audit.md) — including two real bugs caught pre-deploy |
-| Live contract | [`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76) |
+| Live contract | [`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc) |
 | Explorer | https://explorer-studio-dev.genlayer.com |
 
 ## What a reviewer should look at first

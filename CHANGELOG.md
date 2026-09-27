@@ -5,7 +5,7 @@ All notable changes to Non are recorded here.
 ## [1.0.0] — 2026-09-27
 
 Initial build. **Deployed and verified live on GenLayer Studio Next**
-(chain 61997) at `0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`.
+(chain 61997) at `0xb263b7E8972D243639F797948A3322cE1Ca657dc`.
 
 ### Deployed
 - Five-step on-chain smoke test: deploy accepted; `gen_getContractSchema`
@@ -15,8 +15,22 @@ Initial build. **Deployed and verified live on GenLayer Studio Next**
   `UserError` from chain.
 - The frontend was pointed at the live address and confirmed reading real
   state, including the constitution written in the smoke test.
-- Not yet on chain: no case has been opened, because the bonded methods are
-  payable and `genlayer write` cannot attach native GEN.
+- **Live case NON-000001**: opened with a real 2 GEN bond, both evidence URLs
+  fetched on chain, a real prompt run, and validator consensus reached on an
+  APPROVE (score 95). Both nondeterministic paths exercised in production.
+- Frontend deployed to https://non-omega.vercel.app, reading the live contract.
+- Not yet on chain: `finalize` and `claim`, since the six-hour appeal window's
+  floor is deliberately not loosenable.
+
+### Fixed after the first deploy
+- **Event topic overflow and silent field scrambling.** `CaseOpened` declared
+  four indexed fields, but `ABI.EVENT_MAX_TOPICS` is 4 *including* the
+  signature topic, so `open_case` aborted on chain with `SystemError: 2:
+  inval`. Separately, the SDK binds indexed fields by zipping alphabetically
+  sorted names against positional values, so three events recorded their data
+  under the wrong names. gltest direct-mode reproduces neither; all tests
+  passed against the broken code. Both rules are now enforced by
+  `tests/unit/test_events.py`, and the contract was redeployed.
 
 ### Contract
 - Bonded constitutional tribunal with four canonical outcomes: APPROVE,
@@ -47,7 +61,7 @@ Initial build. **Deployed and verified live on GenLayer Studio Next**
   nondeterministic calls the linter could not trace to the equivalence block.
 
 ### Tests
-- 128 passing: 69 pure-logic (no genlayer import) and 59 gltest direct-mode
+- 144 passing: 85 pure-logic (no genlayer import) and 59 gltest direct-mode
   against a real GenVM sandbox, including 8 that execute the real captured
   validator closure.
 

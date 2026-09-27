@@ -7,8 +7,9 @@ _Last updated: 2026-09-27 — deployed and verified live._
 | | |
 | --- | --- |
 | **Deployed** | **Yes — live on Studio Next.** |
-| Address | [`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76) |
-| Deploy tx | [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0x4ca5244a86e67d3606dc93e74fafda59c67b9acb50a0527fc5c69276e8ec2311) — `ACCEPTED` |
+| Address | [`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc) |
+| Live app | https://non-omega.vercel.app |
+| Deploy tx | [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0xb551f25c47e3bf0320c948853a3068810f2c8bc31c86a139564d17c9402f5bd9) — `ACCEPTED` |
 | Treasury / owner | `0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537` |
 | Target network | GenLayer Studio Dev / Studio Next, chain id 61997 |
 | RPC | `https://studio-dev.genlayer.com/api` |
@@ -63,19 +64,39 @@ state: the network chip goes green, `get_config` populates the bond and window
 chips, the board correctly shows zero cases, and the constitution page renders
 the `core-grants` rules that were written on chain in step 4.
 
+## Live case NON-000001
+
+A real case was opened, bonded and adjudicated on chain:
+
+| | |
+| --- | --- |
+| Proposal | "Fund continued work on Non" against `core-grants` v1.0 |
+| Claims | the repository is public; the project is MIT licensed |
+| Evidence | the GitHub repo page and the raw `LICENSE` file |
+| Review bond | **2 GEN**, attached as real native value |
+| Verdict | **APPROVE** / `approved`, score 95, fit 96, risk 8 |
+| Evidence fetches | both URLs retrieved, status 200 |
+
+Both nondeterministic paths ran for real: `gl.nondet.web.get` fetched the two
+pages and `gl.nondet.exec_prompt` produced a verdict that cites each piece of
+evidence specifically. The transaction finished `SUCCESS`, which means the
+**validators independently re-fetched the evidence, re-ran the prompt, and
+agreed** — the equivalence principle holding in production, not in a mock.
+
+The case is viewable at https://non-omega.vercel.app/app/cases/NON-000001.
+
 ## Not yet done
 
-- **No case has been opened on chain.** `open_case`, `challenge` and
-  `finalize` are all payable, and `genlayer write` has no flag for attaching
-  native GEN — so a real bonded end-to-end case requires the frontend with an
-  injected wallet, or a direct `genlayer-js` script. The full case lifecycle is
-  proven in gltest direct-mode against a real GenVM sandbox, not yet on chain.
-- **The frontend's write path has not round-tripped a real transaction.** The
-  Consensus v0.6 fee shape is wired via `estimateTransactionFeesForWrite`, but
-  is unproven from the browser.
-- **No live adjudication has run**, so `gl.nondet.web.get` and
-  `gl.nondet.exec_prompt` have not been exercised against the real network —
-  only against gltest's mocks.
+- **`finalize` and `claim` have not run on chain.** The appeal window is six
+  hours and its floor is deliberately not loosenable (an operator can only
+  make Non stricter), so the case must sit in `APPEAL_WINDOW` until it
+  expires. Every branch of the bond ledger is proven in gltest with value
+  conservation asserted, but no bond has actually been paid out on chain.
+- **`challenge` and re-evaluation have not run on chain**, for the same
+  reason.
+- **No adverse verdict has been produced live.** The one real case was
+  correctly approved, so REJECT, REVISE and INCONCLUSIVE have been exercised
+  only in gltest.
 
 ## Deploy notes for whoever runs it
 

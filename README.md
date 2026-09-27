@@ -66,10 +66,11 @@ by default.
 - **Network:** GenLayer Studio Dev / Studio Next, chain id **61997**
 - **RPC:** `https://studio-dev.genlayer.com/api`
 - **Explorer:** `https://explorer-studio-dev.genlayer.com`
-- **Contract address:** [`0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76`](https://explorer-studio-dev.genlayer.com/address/0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76) — **live**, verified by
+- **App:** [https://non-omega.vercel.app](https://non-omega.vercel.app) — live, reading the contract above
+- **Contract address:** [`0xb263b7E8972D243639F797948A3322cE1Ca657dc`](https://explorer-studio-dev.genlayer.com/address/0xb263b7E8972D243639F797948A3322cE1Ca657dc) — **live**, verified by
   `gen_getContractSchema` (14 methods) and a real on-chain read of
   `get_config`. Deploy tx
-  [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0x4ca5244a86e67d3606dc93e74fafda59c67b9acb50a0527fc5c69276e8ec2311).
+  [`0x4ca5244a86e67d36…`](https://explorer-studio-dev.genlayer.com/tx/0xb551f25c47e3bf0320c948853a3068810f2c8bc31c86a139564d17c9402f5bd9).
 
 Studio Next is a development network. Its operators can reset it; if that
 happens, deployed contracts and every case in them are gone and the protocol
@@ -82,9 +83,9 @@ pip install genlayer-test genvm-linter Pillow pytest
 python -m pytest tests -q
 ```
 
-128 tests, in two layers:
+144 tests, in two layers:
 
-- `tests/unit` — 69 plain-pytest tests over `contracts/non_lib.py`, which has
+- `tests/unit` — 85 plain-pytest tests over `contracts/non_lib.py`, which has
   zero genlayer imports. URL allowlist and SSRF guard, enum canonicalization,
   evidence normalization, the equivalence comparator, and every branch of the
   bond ledger including value conservation.

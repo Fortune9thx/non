@@ -408,7 +408,7 @@ def _floor_config(raw, default: int) -> int:
 
 class ScopeRegistered(gl.chain.Event):
 
-    def __init__(self, scope_id: str, admin: Address, /):
+    def __init__(self, admin: Address, scope_id: str, /):
         ...
 
 class ConstitutionSet(gl.chain.Event):
@@ -418,7 +418,7 @@ class ConstitutionSet(gl.chain.Event):
 
 class CaseOpened(gl.chain.Event):
 
-    def __init__(self, case_id: str, scope_id: str, proposer: Address, rules_version: str, /):
+    def __init__(self, case_id: str, proposer: Address, scope_id: str, /, **blob):
         ...
 
 class CaseDecided(gl.chain.Event):
@@ -438,7 +438,7 @@ class CaseFinalized(gl.chain.Event):
 
 class Claimed(gl.chain.Event):
 
-    def __init__(self, claimant: Address, amount: u256, /):
+    def __init__(self, amount: u256, claimant: Address, /):
         ...
 
 class Non(gl.contract.Contract):
@@ -508,7 +508,7 @@ class Non(gl.contract.Contract):
         if self.scopes.get(sid) is not None:
             raise gl.vm.UserError(USER_ERRORS['SCOPE_EXISTS'])
         self._save_scope(sid, {'scope_id': sid, 'admin': admin_hex, 'constitution': None, 'created_at': _now_ts()})
-        ScopeRegistered(sid, Address(admin_hex)).emit()
+        ScopeRegistered(Address(admin_hex), sid).emit()
         return sid
 
     @gl.public.write
@@ -550,7 +550,7 @@ class Non(gl.contract.Contract):
         self._save_case(case_id, rec)
         self._index(self.address_cases, proposer, case_id)
         self._index(self.scope_cases, sid, case_id)
-        CaseOpened(case_id, sid, Address(proposer), constitution['version']).emit()
+        CaseOpened(case_id, Address(proposer), sid, rules_version=constitution['version']).emit()
         return case_id
 
     @gl.public.write
@@ -708,7 +708,7 @@ class Non(gl.contract.Contract):
             raise gl.vm.UserError(USER_ERRORS['NOTHING_TO_CLAIM'])
         self.claimable[sender] = u256(0)
         gl.contract.get_at(gl.message.sender_address).emit_transfer(value=u256(owed))
-        Claimed(gl.message.sender_address, u256(owed)).emit()
+        Claimed(u256(owed), gl.message.sender_address).emit()
         return u256(owed)
 
     @gl.public.view

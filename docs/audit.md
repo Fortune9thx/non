@@ -57,7 +57,39 @@ crashed, nothing looked wrong, and the protocol would simply never have
 reached a verdict. Fixed by decoding bytes inside `normalize_evidence`, with
 tests for bytes, undecodable bytes, and `None`.
 
-### 3. `genvm-lint` findings
+### 3. Events: a topic-budget overflow and silent field scrambling
+
+**Severity: high (one broke `open_case` outright). Found on the live network,
+after a clean deploy, fixed and redeployed.**
+
+The first deploy was live and healthy, but `open_case` aborted on chain with
+`SystemError: 2: inval` inside `Event.emit_raw`. Two distinct SDK rules were
+being violated, and **gltest direct-mode reproduces neither** — all 128 tests
+passed against the broken code.
+
+**a. The topic budget counts the signature.** `ABI.EVENT_MAX_TOPICS` is 4, and
+the event's own signature occupies one topic, so only **three** indexed fields
+fit. `CaseOpened` declared four. Locally the SDK only issues a
+`warnings.warn` — nothing fails — so the contract sails through every local
+test and then dies on the real network. The fourth field moved into the
+keyword blob.
+
+**b. Indexed fields are bound by sorted name, not by position.** The SDK
+builds `indexed_args = tuple(sorted(...))` and then binds values with
+`zip(indexed_args, args)` — alphabetically sorted *names* against positional
+*values*. If a declaration's parameter order is not already alphabetical,
+every value is silently recorded under the wrong field name. Nothing raises,
+on chain or off. Three events were affected: `ScopeRegistered(scope_id,
+admin)` and `Claimed(claimant, amount)` had their two fields transposed, and
+`CaseOpened` was scrambled outright. All declarations are now in alphabetical
+order.
+
+Events are logs rather than consensus state, so (b) could not have moved money
+— but it would have made the emitted record permanently wrong, which is worse
+than useless for anyone indexing it. `tests/unit/test_events.py` now enforces
+both rules by parsing the contract source, so neither can regress silently.
+
+### 4. `genvm-lint` findings
 
 - `_floor` was a `@staticmethod`; the linter requires `self` as the first
   parameter of a contract method. Moved to a module-level function.
@@ -174,14 +206,14 @@ canonical outcomes, and cannot move money without a second node agreeing.
 
 ## Known limits and unproven claims
 
-1. **Deployed, but no case has run on chain.** The contract is live at
-   `0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76` and a five-step smoke test passed (see `docs/STATUS.md`), but no
-   case has been opened, evaluated or settled on the real network — the bonded
-   methods are payable and the CLI cannot attach native GEN. The full
-   lifecycle is proven in gltest direct-mode against a real GenVM sandbox,
-   which is a genuine execution proof but not a network proof. In particular,
-   `gl.nondet.web.get` and `gl.nondet.exec_prompt` have only ever run against
-   gltest's mocks.
+1. **A full case has not been settled on chain.** The contract is live at
+   `0xb263b7E8972D243639F797948A3322cE1Ca657dc` and one real case, `NON-000001`, was opened with a 2 GEN bond and
+   adjudicated live — real HTTPS fetches, a real prompt, and validator
+   consensus. What has *not* run on chain is `finalize` and `claim`: the
+   appeal window is six hours and its floor is deliberately not loosenable, so
+   the bond ledger has still only been exercised in gltest. Challenge and
+   re-evaluation are likewise unproven live.
+
 2. **Payable methods are untestable from the CLI.** `genlayer write` has no
    flag for attaching native GEN, so a real bonded call requires a wallet or a
    direct `genlayer-js` script. `open_case`, `challenge` and `finalize` are
