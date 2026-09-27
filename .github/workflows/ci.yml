@@ -30,6 +30,24 @@ jobs:
         # does not contain what it claims to.
         run: git diff --exit-code -- build/Non.bundled.py
 
+      # genvm-lint's validation step needs the py-genlayer runner tarball for
+      # the EXACT SDK version pinned in the bundle's Depends header. Left to
+      # itself on a cold runner it fetches a default SDK that does not contain
+      # that hash and fails with "filename 'runners/py-genlayer/..' not found".
+      # `setup -c` auto-detects the version from the contract itself, so this
+      # populates the cache with the right one first.
+      - name: Cache the GenVM SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/genvm-linter
+            ~/.cache/gltest-direct
+          key: genvm-${{ runner.os }}-${{ hashFiles('build/Non.bundled.py') }}
+          restore-keys: genvm-${{ runner.os }}-
+
+      - name: Fetch the pinned SDK
+        run: genvm-lint setup -c build/Non.bundled.py --json
+
       - name: Lint the bundle
         run: genvm-lint check build/Non.bundled.py
 
