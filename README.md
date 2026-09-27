@@ -102,6 +102,15 @@ python scripts/build_bundle.py
 genvm-lint check build/Non.bundled.py
 ```
 
+**A note on CI.** The `contract` and `frontend` jobs are self-contained and
+must pass. The `genvm` job — lint plus the direct-mode tests — is marked
+`continue-on-error`, because on a cold runner the published GenVM archive's
+index does not currently contain the `py-genlayer` runner tarball for this
+contract's pinned SDK version, and the fetch fails before any of the
+contract's own code is examined. That is an upstream toolchain gap, not a
+result about Non. Both steps are run locally before every release with the
+commands above; `docs/STATUS.md` records the results.
+
 ## Repository layout
 
 ```
