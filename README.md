@@ -61,6 +61,25 @@ collapses to `INCONCLUSIVE`. An `APPROVE` additionally requires that at least
 one evidence URL was actually retrieved. No input shape produces an approval
 by default.
 
+## When a case gets stuck
+
+Consensus is not guaranteed to converge. A case whose evaluation never
+succeeds would otherwise hold both bonds forever, so there is a bounded
+escape hatch: after **72 hours**, `expire_case` settles it as `INCONCLUSIVE`
+and returns every bond exactly, with no fee and no winner.
+
+**Only a party to the case may call it** — the proposer while the case is
+unchallenged, the proposer or the challenger once it is challenged. Expiry is
+terminal, so leaving it open to anyone means any address could end any funded
+case 72 hours after it opened, costing the caller only gas and forcing the
+proposer to re-open and re-bond. Bonds refund exactly, so nothing is stolen;
+it is a griefing vector, not a theft one.
+
+Liveness survives the restriction. Each party can exit alone, so neither is
+hostage to the other's inaction, and `evaluate_case`, `finalize` and `claim`
+stay permissionless — anyone may push a case forward. Only *ending* one is
+restricted.
+
 ## Network and status
 
 - **Network:** GenLayer Studio Dev / Studio Next, chain id **61997**
@@ -78,18 +97,30 @@ must be redeployed. This is stated in the UI, not buried here.
 
 ## Running the tests
 
+**177 tests in two layers.** The first needs nothing but pytest; the second
+needs the GenVM runner.
+
 ```bash
-pip install genlayer-test genvm-linter Pillow pytest
-python -m pytest tests/unit -q -p no:gltest
+# Layer 1 — 107 pure-logic tests, no SDK, no network
+pip install pytest
+python -m pytest tests/unit -q
 ```
 
-170 tests, in two layers:
+```bash
+# Layer 2 — 70 direct-mode tests against a real GenVM sandbox
+pip install genlayer-test genvm-linter Pillow
+python -m pytest tests/direct -q
+```
 
-- `tests/unit` — 101 plain-pytest tests over `contracts/non_lib.py`, which has
+If `genlayer-test` is installed, layer 1 needs `-p no:gltest`: its pytest
+plugin validates every network in `gltest.config.yaml` and blocks collection
+because `studio_devnet` has no `accounts` key.
+
+- `tests/unit` — 107 plain-pytest tests over `contracts/non_lib.py`, which has
   zero genlayer imports. URL allowlist and SSRF guard, enum canonicalization,
   evidence normalization, the equivalence comparator, and every branch of the
   bond ledger including value conservation.
-- `tests/direct` — 69 gltest direct-mode tests that deploy the real bundle
+- `tests/direct` — 70 gltest direct-mode tests that deploy the real bundle
   into a GenVM sandbox and drive the whole flow: scopes, constitutions,
   version pinning, all four outcomes, the appeal window, bond accounting, and
   claims. Eight of them run the **real captured validator closure** with the
@@ -117,11 +148,20 @@ commands above; `docs/STATUS.md` records the results.
 ```
 contracts/    non_lib.py (pure logic, no genlayer import) + Non.py
 scripts/      build_bundle.py — produces the single deployable file
-tests/        unit/ (plain pytest) + direct/ (gltest, real GenVM)
-docs/         architecture · audit · STEWARD · STATUS
+              check_line_endings.py — LF-only gate, enforced in CI
+tests/        unit/ (107, plain pytest) + direct/ (70, gltest, real GenVM)
+docs/         architecture · audit · STEWARD · STATUS · SUBMISSION
+deploy/       deployments.json — the live address, and every superseded one
 frontend/     Vite + React + TypeScript app, fails closed
 build/        generated Non.bundled.py — do not hand-edit
 ```
+
+`deploy/deployments.json` is the single source of truth for what is live. An
+address is recorded there only after `gen_getContractSchema` confirms it, and
+every superseded address keeps the reason it was replaced.
+
+Security policy, trust boundaries and the authorisation rules for each method:
+[SECURITY.md](SECURITY.md).
 
 `contracts/Non.py` and `contracts/non_lib.py` are the sources of truth.
 The network only ever receives `build/Non.bundled.py`, whose first line is the

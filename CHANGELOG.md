@@ -30,6 +30,23 @@ Redeployed to GenLayer Studio Next (chain 61997) at
 - Two real bonded cases opened and adjudicated: `NON-000001` APPROVE
   (95 / fit 92 / risk 5) and `NON-000002` APPROVE (100 / fit 100 / risk 0).
 
+### Documentation and repository hygiene
+- Corrected the test counts, which were wrong and internally inconsistent:
+  the suite is **177** (107 unit + 70 direct), not 170, and the README's own
+  breakdown (101 + 69) did not sum to the total it stated.
+- `SECURITY.md` claimed the contract was not deployed and made no
+  live-network security claim. It now records the live address, the
+  authorisation boundary for every restricted method, the unheld `owner`
+  key, and what remains unexercised on chain.
+- Documented the expiry escape hatch in `README.md`, including who may call
+  `expire_case` and why it is restricted — it was absent entirely.
+- `README.md` test instructions now separate the two layers by what they
+  require, and note the `-p no:gltest` workaround.
+- Repository layout now lists `deploy/` and links `SECURITY.md`.
+- Untracked `frontend/tsconfig.tsbuildinfo`, a TypeScript incremental build
+  cache that should never have been committed, and extended
+  `frontend/.gitignore` to cover it.
+
 ### Notes
 - Deployed from an ephemeral key funded via `sim_fundAccount`, so `owner` has
   no live holder. `treasury` and the `core-grants` scope `admin` were both set
@@ -97,7 +114,7 @@ Initial build. **Deployed and verified live on GenLayer Studio Next**
   nondeterministic calls the linter could not trace to the equivalence block.
 
 ### Tests
-- 144 passing: 101 pure-logic (no genlayer import) and 69 gltest direct-mode
+- 170 passing: 101 pure-logic (no genlayer import) and 69 gltest direct-mode
   against a real GenVM sandbox, including 8 that execute the real captured
   validator closure.
 

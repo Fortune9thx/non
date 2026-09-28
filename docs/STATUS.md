@@ -46,10 +46,10 @@ on a scope the caller does not already administer, which does not apply to
 | Layer | Count | What it proves |
 | --- | --- | --- |
 | `tests/unit` | 107 | Pure logic in isolation: URL allowlist + SSRF guard, enum canonicalization, evidence normalization, envelope binding, the equivalence comparator, the expiry predicate, and the full bond ledger with value conservation. No genlayer import. |
-| `tests/direct` | 69 | The real bundle deployed into a GenVM sandbox: scopes, constitution pinning, all four outcomes, the appeal window and the 72h expiry window (via `warp`), bond accounting, claims, config floors. |
+| `tests/direct` | 70 | The real bundle deployed into a GenVM sandbox: scopes, constitution pinning, all four outcomes, the appeal window and the 72h expiry window (via `warp`), bond accounting, claims, config floors. |
 | — of which validator | 8 | The **real captured validator closure**, run with web/LLM mocks swapped underneath it. |
 | — of which event guards | 16 | Parse the contract source and enforce the indexed-field limit and ordering rules that gltest cannot reach. |
-| **Total** | **170** | 107 executed and passing (see below). |
+| **Total** | **177** | 107 executed and passing (see below). |
 
 **Which of these actually ran for this release.** `tests/unit` was executed:
 107 passed. `tests/direct` **could not be executed in this environment** — its
@@ -57,7 +57,7 @@ pinned GenVM runner, `genvm-universal.tar.xz` from `genvm v0.6.0-rc6`, returns
 HTTP 404, a known upstream asset gap (`v0.6.0`, `rc5` and `rc7` were checked
 and 404 as well), and CI already marks that job `continue-on-error`. Three
 expiry tests were updated by hand for the new participant rule and remain
-unexecuted. So the 170 figure describes the suite, not this run.
+unexecuted. So the 177 figure describes the suite, not this run.
 
 ## Verification actually performed
 

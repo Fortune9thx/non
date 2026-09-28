@@ -68,7 +68,7 @@ each validator fetches for itself. Neither is computable from on-chain data.
   branch remain unproven live.
 - The `tests/direct` suite could not be executed for this release: its pinned
   GenVM runner asset returns HTTP 404 upstream. 107 pure-logic tests were
-  executed and pass; the 170 figure describes the full suite, not this run.
+  executed and pass; the 177 figure describes the full suite, not this run.
 - No adverse verdict (REJECT/REVISE) has been produced live.
 - Live LLM output is non-deterministic, and this project has observed it
   directly: the superseded deploy produced an INCONCLUSIVE on this exact

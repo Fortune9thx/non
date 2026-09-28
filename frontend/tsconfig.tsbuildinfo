@@ -1,1 +1,0 @@
-{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/art/Art.tsx","./src/components/AppShell.tsx","./src/components/Common.tsx","./src/lib/chain.ts","./src/pages/Board.tsx","./src/pages/CaseTicket.tsx","./src/pages/Cases.tsx","./src/pages/Claims.tsx","./src/pages/Constitution.tsx","./src/pages/Landing.tsx","./src/pages/OpenCase.tsx"],"version":"5.9.3"}
