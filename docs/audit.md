@@ -124,7 +124,7 @@ how long a genuinely ambiguous case, or a validator-infrastructure problem,
 can make every attempt at agreement fail — and for as long as that lasts, the
 bonds sit locked with no way out.
 
-Added `expire_case`: after 72 hours with no reachable verdict, anyone may
+Added `expire_case`: after 72 hours with no reachable verdict, a party may
 expire the case and every bond is returned exactly, with no fee and no winner.
 It cannot run on a FINAL case, and it cannot run on a decided, unchallenged
 case — that one simply needs its appeal window to close before `finalize`

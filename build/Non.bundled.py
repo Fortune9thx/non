@@ -38,7 +38,7 @@ STATE_REVIEWING = 'REVIEWING'
 STATE_DECIDED = 'DECIDED'
 STATE_APPEAL_WINDOW = 'APPEAL_WINDOW'
 STATE_FINAL = 'FINAL'
-USER_ERRORS = {'SCOPE_EXISTS': 'scope exists', 'SCOPE_MISSING': 'scope missing', 'NOT_SCOPE_ADMIN': 'not scope admin', 'CONSTITUTION_MISSING': 'constitution missing', 'CASE_MISSING': 'case missing', 'BOND_TOO_LOW': 'bond too low', 'BAD_SUBJECT': 'bad subject', 'BAD_URLS': 'bad urls', 'BAD_VERSION': 'bad version', 'BAD_RULES': 'bad rules', 'BAD_SCOPE_ID': 'bad scope id', 'NOT_OPEN': 'case not open', 'ALREADY_DECIDED': 'case already decided', 'APPEAL_CLOSED': 'appeal closed', 'APPEAL_OPEN': 'appeal open', 'ALREADY_CHALLENGED': 'already challenged', 'SELF_CHALLENGE': 'proposer cannot challenge', 'NOT_DECIDED': 'case not decided', 'NOT_FINAL': 'case not final', 'ALREADY_FINAL': 'case already final', 'NOTHING_TO_CLAIM': 'nothing to claim', 'EVAL_FAILED': 'evaluation failed', 'NOT_EXPIRED': 'case not expired', 'NOT_EXPIRABLE': 'case not expirable'}
+USER_ERRORS = {'SCOPE_EXISTS': 'scope exists', 'SCOPE_MISSING': 'scope missing', 'NOT_SCOPE_ADMIN': 'not scope admin', 'CONSTITUTION_MISSING': 'constitution missing', 'CASE_MISSING': 'case missing', 'BOND_TOO_LOW': 'bond too low', 'BAD_SUBJECT': 'bad subject', 'BAD_URLS': 'bad urls', 'BAD_VERSION': 'bad version', 'BAD_RULES': 'bad rules', 'BAD_SCOPE_ID': 'bad scope id', 'NOT_OPEN': 'case not open', 'ALREADY_DECIDED': 'case already decided', 'APPEAL_CLOSED': 'appeal closed', 'APPEAL_OPEN': 'appeal open', 'ALREADY_CHALLENGED': 'already challenged', 'SELF_CHALLENGE': 'proposer cannot challenge', 'NOT_DECIDED': 'case not decided', 'NOT_FINAL': 'case not final', 'ALREADY_FINAL': 'case already final', 'NOTHING_TO_CLAIM': 'nothing to claim', 'EVAL_FAILED': 'evaluation failed', 'NOT_EXPIRED': 'case not expired', 'NOT_EXPIRABLE': 'case not expirable', 'NOT_PARTICIPANT': 'not a party to this case'}
 
 class NonValidationError(Exception):
 
@@ -392,11 +392,18 @@ def case_state(rec: dict, now_ts: int, window_seconds: int=APPEAL_WINDOW_SECONDS
 
 def expiry_deadline(rec: dict, expiry_seconds: int=EXPIRY_SECONDS) -> int:
     state = rec.get('state')
-    if state == STATE_OPEN:
+    awaiting_second_reading = bool(rec.get('challenger')) and int(rec.get('eval_rounds', 0)) < 2
+    if state in (STATE_OPEN, STATE_REVIEWING) and (not awaiting_second_reading):
         return int(rec.get('opened_at', 0)) + int(expiry_seconds)
-    if state == STATE_DECIDED and rec.get('challenger') and (int(rec.get('eval_rounds', 0)) < 2):
+    if state in (STATE_DECIDED, STATE_REVIEWING) and awaiting_second_reading:
         return int(rec.get('challenged_at', 0)) + int(expiry_seconds)
     return 0
+
+def expire_callers(rec: dict) -> set:
+    parties = {rec.get('proposer', '')}
+    if rec.get('challenger'):
+        parties.add(rec['challenger'])
+    return {p for p in parties if p}
 
 def case_is_expirable(rec: dict, now_ts: int, expiry_seconds: int=EXPIRY_SECONDS) -> bool:
     deadline = expiry_deadline(rec, expiry_seconds)
@@ -754,6 +761,8 @@ class Non(gl.contract.Contract):
         now_ts = _now_ts()
         if rec['state'] == STATE_FINAL:
             raise gl.vm.UserError(USER_ERRORS['ALREADY_FINAL'])
+        if Address(_sender()).as_hex not in expire_callers(rec):
+            raise gl.vm.UserError(USER_ERRORS['NOT_PARTICIPANT'])
         if expiry_deadline(rec, int(self.expiry_window)) == 0:
             raise gl.vm.UserError(USER_ERRORS['NOT_EXPIRABLE'])
         if not case_is_expirable(rec, now_ts, int(self.expiry_window)):

@@ -120,6 +120,7 @@ USER_ERRORS = {
     "EVAL_FAILED": "evaluation failed",
     "NOT_EXPIRED": "case not expired",
     "NOT_EXPIRABLE": "case not expirable",
+    "NOT_PARTICIPANT": "not a party to this case",
 }
 
 
@@ -747,24 +748,64 @@ def expiry_deadline(rec: dict, expiry_seconds: int = EXPIRY_SECONDS) -> int:
     """When a stuck case becomes expirable, or 0 if it is not the kind of
     case that can be stuck.
 
-    Two states can stall with bonds held and no reachable verdict:
+    Two situations can stall with bonds held and no reachable verdict:
 
-    - ``OPEN``: every ``evaluate_case`` attempt fails to reach validator
-      agreement, so the case never gets a decision at all.
-    - ``DECIDED`` with a challenger still awaiting its second reading: the
+    - awaiting a first verdict (``OPEN``): every ``evaluate_case`` attempt
+      fails to reach validator agreement, so the case never gets a decision
+      at all.
+    - awaiting a second reading (``DECIDED`` with a challenger): the
       re-evaluation cannot converge, and ``finalize`` deliberately refuses
       to settle a challenged case on one round.
+
+    ``REVIEWING`` is included in both. It is written to storage before the
+    nondeterministic block runs, and today it can never be observed, because
+    a transaction that reverts or fails to converge persists nothing -- the
+    ``REVIEWING`` write only ever commits alongside the ``DECIDED`` write at
+    the end of the same transaction. Covering it anyway costs nothing and
+    means an early return introduced between those two points cannot strand
+    bonds in a state with no way out.
 
     A decided, unchallenged case is NOT expirable -- once its appeal window
     closes, ``finalize`` already settles it, so an expiry path there would
     only be a way to dodge a resolved outcome.
     """
     state = rec.get("state")
-    if state == STATE_OPEN:
+    awaiting_second_reading = (
+        bool(rec.get("challenger")) and int(rec.get("eval_rounds", 0)) < 2
+    )
+    if state in (STATE_OPEN, STATE_REVIEWING) and not awaiting_second_reading:
         return int(rec.get("opened_at", 0)) + int(expiry_seconds)
-    if state == STATE_DECIDED and rec.get("challenger")             and int(rec.get("eval_rounds", 0)) < 2:
+    if state in (STATE_DECIDED, STATE_REVIEWING) and awaiting_second_reading:
         return int(rec.get("challenged_at", 0)) + int(expiry_seconds)
     return 0
+
+
+def expire_callers(rec: dict) -> set:
+    """Who may expire this case: the parties whose bonds are locked in it.
+
+    `expire_case` moves a case to FINAL permanently, and `evaluate_case`
+    refuses a FINAL case, so expiring one ends it for good. Left
+    unauthenticated, that lets any stranger with no stake terminally halt a
+    funded case 72h after it opened -- without evidence that evaluation was
+    ever attempted, let alone that it failed, and without any validator
+    review. Bonds refund exactly, so nothing is stolen, but the proposer
+    must re-open and re-bond, and the attack costs the caller only gas.
+
+    Binding by attempt count is not available: `eval_rounds` only increments
+    after a round that already succeeded, so a case evaluated fifty times
+    without convergence is indistinguishable on chain from one nobody ever
+    tried -- a transaction that does not converge persists no state at all.
+    Binding to the parties is what the platform does support.
+
+    Every liveness guarantee survives: each party can always exit alone, so
+    neither can be held hostage by the other's inaction, and `evaluate_case`
+    stays permissionless so anyone may still push a case forward. Only
+    ending one is restricted.
+    """
+    parties = {rec.get("proposer", "")}
+    if rec.get("challenger"):
+        parties.add(rec["challenger"])
+    return {p for p in parties if p}
 
 
 def case_is_expirable(rec: dict, now_ts: int,

@@ -781,7 +781,8 @@ class TestExpiry:
         retriable' is not 'guaranteed to converge'."""
         case_id = _open_case(scoped, direct_vm, sender=direct_alice)
         direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
-        assert scoped.expire_case(case_id=case_id) == "inconclusive"
+        with direct_vm.prank(direct_alice):
+            assert scoped.expire_case(case_id=case_id) == "inconclusive"
 
         rec = _case(scoped, case_id)
         assert rec["state"] == "FINAL"
@@ -790,14 +791,34 @@ class TestExpiry:
         assert _claimable(scoped, direct_alice) == REVIEW_BOND
         assert _claimable(scoped, direct_owner) == 0  # no fee, ever
 
-    def test_expiry_is_permissionless(self, scoped, direct_vm, direct_alice,
-                                      direct_bob):
+    def test_a_stranger_cannot_expire_a_case(self, scoped, direct_vm,
+                                             direct_alice, direct_bob):
+        """Expiring a case moves it to FINAL, and evaluate_case refuses a
+        FINAL case, so an unauthenticated expiry would let anyone terminally
+        halt a funded case on the clock alone -- no evidence that evaluation
+        was ever attempted, no validator review. Bonds refunding exactly is
+        not a defence: the proposer still has to re-open and re-bond, and it
+        costs the attacker only gas."""
         case_id = _open_case(scoped, direct_vm, sender=direct_alice)
         direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
         with direct_vm.prank(direct_bob):
+            with pytest.raises(Exception,
+                               match=re.escape("not a party to this case")):
+                scoped.expire_case(case_id=case_id)
+
+        # The revert alone is only suggestive; the proof is that the case is
+        # untouched and still adjudicable.
+        assert _claimable(scoped, direct_alice) == 0
+        assert json.loads(scoped.get_case(case_id=case_id))["state"] != "FINAL"
+
+    def test_the_proposer_may_expire_their_own_stuck_case(
+        self, scoped, direct_vm, direct_alice
+    ):
+        case_id = _open_case(scoped, direct_vm, sender=direct_alice)
+        direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
+        with direct_vm.prank(direct_alice):
             scoped.expire_case(case_id=case_id)
         assert _claimable(scoped, direct_alice) == REVIEW_BOND
-        assert _claimable(scoped, direct_bob) == 0
 
     def test_stuck_challenged_case_expires_and_refunds_both_sides(
         self, scoped, direct_vm, direct_alice, direct_bob, direct_owner
@@ -808,9 +829,12 @@ class TestExpiry:
             direct_vm.value = CHALLENGE_BOND
             scoped.challenge(case_id=case_id, note="Claim 2 is false.")
 
-        # The re-evaluation never converges.
+        # The re-evaluation never converges. Expired here by the CHALLENGER,
+        # proving either party can exit alone and neither is hostage to the
+        # other's inaction.
         direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
-        scoped.expire_case(case_id=case_id)
+        with direct_vm.prank(direct_bob):
+            scoped.expire_case(case_id=case_id)
 
         assert _claimable(scoped, direct_alice) == REVIEW_BOND
         assert _claimable(scoped, direct_bob) == CHALLENGE_BOND
@@ -837,8 +861,8 @@ class TestExpiry:
                                                 direct_alice):
         case_id = _open_case(scoped, direct_vm, sender=direct_alice)
         direct_vm.warp(_iso(BASE_TIME + timedelta(seconds=EXPIRY + 1)))
-        scoped.expire_case(case_id=case_id)
         with direct_vm.prank(direct_alice):
+            scoped.expire_case(case_id=case_id)
             assert int(scoped.claim()) == REVIEW_BOND
 
 

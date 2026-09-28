@@ -109,10 +109,20 @@ export default function CaseTicket() {
     (!record.challenger || record.eval_rounds >= 2);
 
   // The bounded escape hatch: only offered once a case has actually been
-  // stuck past its expiry window with no reachable verdict.
+  // stuck past its expiry window with no reachable verdict, and only to a
+  // party whose bond is locked in it. Expiring ends a case permanently, so
+  // the contract refuses a caller with nothing at stake; mirroring that here
+  // means a stranger sees no button rather than an opaque revert.
+  const isChallenger =
+    !!account &&
+    !!record.challenger &&
+    account.toLowerCase() === record.challenger.toLowerCase();
   const expiryDeadline = record.expiry_deadline ?? 0;
   const canExpire =
-    !!account && state !== "FINAL" && expiryDeadline > 0 && now >= expiryDeadline;
+    (isProposer || isChallenger) &&
+    state !== "FINAL" &&
+    expiryDeadline > 0 &&
+    now >= expiryDeadline;
 
   return (
     <>

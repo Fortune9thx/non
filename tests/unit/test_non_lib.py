@@ -617,3 +617,61 @@ def test_binding_allows_a_subset_of_locked_urls():
     only citing a url that was never locked is not."""
     out = _bind(_envelope(evidence=[]))
     assert out["bound"] is True and out["records"] == []
+
+
+# ---------------------------------------------------------------------------
+# Who may expire a case
+#
+# expire_case moves a case to FINAL, and evaluate_case refuses a FINAL case,
+# so expiring one ends it permanently. Unauthenticated, that lets a stranger
+# with nothing at stake terminally halt a funded case on the clock alone.
+# ---------------------------------------------------------------------------
+
+
+def test_only_the_proposer_may_expire_an_unchallenged_case():
+    rec = _open_rec(proposer=PROPOSER)
+    assert L.expire_callers(rec) == {PROPOSER}
+
+
+def test_either_party_may_expire_a_challenged_case():
+    """Both have bonds locked and either may be the stalled one, so neither
+    can hold the other hostage by refusing to act."""
+    rec = _open_rec(state=L.STATE_DECIDED, proposer=PROPOSER,
+                    challenger=CHALLENGER, eval_rounds=1, challenged_at=T0)
+    assert L.expire_callers(rec) == {PROPOSER, CHALLENGER}
+
+
+def test_a_stranger_is_never_an_expire_caller():
+    for rec in (
+        _open_rec(proposer=PROPOSER),
+        _open_rec(state=L.STATE_DECIDED, proposer=PROPOSER,
+                  challenger=CHALLENGER, eval_rounds=1, challenged_at=T0),
+    ):
+        assert "0xstranger" not in L.expire_callers(rec)
+
+
+def test_expire_callers_never_yields_an_empty_address():
+    """An empty challenger field must not become a callable party -- an
+    unset address would otherwise authorise anyone whose normalized sender
+    compared equal to it."""
+    assert "" not in L.expire_callers(_open_rec(proposer=PROPOSER))
+
+
+# ---------------------------------------------------------------------------
+# REVIEWING coverage (defensive -- see expiry_deadline's docstring)
+# ---------------------------------------------------------------------------
+
+
+def test_reviewing_awaiting_a_first_verdict_is_expirable():
+    rec = _open_rec(state=L.STATE_REVIEWING)
+    assert L.expiry_deadline(rec) == T0 + L.EXPIRY_SECONDS
+    assert L.case_is_expirable(rec, T0 + L.EXPIRY_SECONDS)
+
+
+def test_reviewing_awaiting_a_second_reading_dates_from_the_challenge():
+    """A re-evaluation must not inherit the original open time, or it would
+    be expirable the instant it is challenged."""
+    rec = _open_rec(state=L.STATE_REVIEWING, challenger=CHALLENGER,
+                    eval_rounds=1, challenged_at=T0 + 10_000)
+    assert L.expiry_deadline(rec) == T0 + 10_000 + L.EXPIRY_SECONDS
+    assert not L.case_is_expirable(rec, T0 + L.EXPIRY_SECONDS)

@@ -27,7 +27,7 @@ detects that and renders its real empty state rather than stale data.
 
 | Layer | Count | What it proves |
 | --- | --- | --- |
-| `tests/unit` | 101 | Pure logic in isolation: URL allowlist + SSRF guard, enum canonicalization, evidence normalization, envelope binding, the equivalence comparator, the expiry predicate, and the full bond ledger with value conservation. No genlayer import. |
+| `tests/unit` | 107 | Pure logic in isolation: URL allowlist + SSRF guard, enum canonicalization, evidence normalization, envelope binding, the equivalence comparator, the expiry predicate, and the full bond ledger with value conservation. No genlayer import. |
 | `tests/direct` | 69 | The real bundle deployed into a GenVM sandbox: scopes, constitution pinning, all four outcomes, the appeal window and the 72h expiry window (via `warp`), bond accounting, claims, config floors. |
 | — of which validator | 8 | The **real captured validator closure**, run with web/LLM mocks swapped underneath it. |
 | — of which event guards | 16 | Parse the contract source and enforce the indexed-field limit and ordering rules that gltest cannot reach. |
@@ -104,8 +104,9 @@ Viewable at https://non-omega.vercel.app/app.
   bond has actually been paid out on chain yet.
 - **`expire_case` has not run on chain.** It requires a case to be stuck for
   72 hours, which by construction cannot be demonstrated sooner. It is fully
-  covered in gltest, including that it refunds exactly, is permissionless,
-  and refuses to run on a decided-unchallenged or already-final case.
+  covered in gltest, including that it refunds exactly, that only a party to
+  the case may call it, and that it refuses to run on a decided-unchallenged
+  or already-final case.
 - **`challenge` and re-evaluation have not run on chain**, for the same
   appeal-window reason.
 - **No adverse verdict has been produced live.** REJECT and REVISE have been

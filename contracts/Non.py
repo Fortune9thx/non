@@ -626,16 +626,25 @@ class Non(gl.contract.Contract):
 
         After the expiry window this path returns every bond exactly once,
         with no fee and no winner -- the same accounting as INCONCLUSIVE. It
-        is permissionless, it cannot run once a case is FINAL, and it cannot
-        run on a decided, unchallenged case (whose appeal window simply
-        needs to close before `finalize` settles it), so it can never be
-        used to dodge a resolved outcome.
+        cannot run once a case is FINAL, and it cannot run on a decided,
+        unchallenged case (whose appeal window simply needs to close before
+        `finalize` settles it), so it can never be used to dodge a resolved
+        outcome.
+
+        Restricted to the parties whose bonds are locked in the case -- the
+        proposer, and the challenger once there is one. Expiring a case ends
+        it permanently, since `evaluate_case` refuses a FINAL case, so an
+        unauthenticated version would let any stranger terminally halt a
+        funded case on the clock alone. Each party can still exit alone, so
+        neither is hostage to the other's inaction. See `expire_callers`.
         """
         rec = self._load_case(case_id)
         now_ts = _now_ts()
 
         if rec["state"] == STATE_FINAL:
             raise gl.vm.UserError(USER_ERRORS["ALREADY_FINAL"])
+        if Address(_sender()).as_hex not in expire_callers(rec):
+            raise gl.vm.UserError(USER_ERRORS["NOT_PARTICIPANT"])
         if expiry_deadline(rec, int(self.expiry_window)) == 0:
             raise gl.vm.UserError(USER_ERRORS["NOT_EXPIRABLE"])
         if not case_is_expirable(rec, now_ts, int(self.expiry_window)):
