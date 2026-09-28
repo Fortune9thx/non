@@ -86,12 +86,12 @@ let readClientPromise: Promise<unknown> | null = null;
 async function readClient(): Promise<unknown> {
   if (!readClientPromise) {
     readClientPromise = (async () => {
-      const [{ createClient }, { studionet }] = await Promise.all([
+      const [{ createClient }, { studioDevnet }] = await Promise.all([
         import("genlayer-js"),
         import("genlayer-js/chains"),
       ]);
       const chain = {
-        ...studionet,
+        ...studioDevnet,
         id: CHAIN_ID,
         rpcUrls: { default: { http: [RPC_URL] } },
       };
@@ -502,12 +502,12 @@ export async function writeContract({ method, args, value, account }: WriteArgs)
   if (!provider) throw new Error("No injected wallet found in this browser.");
   await ensureChain();
 
-  const [{ createClient }, { studionet }] = await Promise.all([
+  const [{ createClient }, { studioDevnet }] = await Promise.all([
     import("genlayer-js"),
     import("genlayer-js/chains"),
   ]);
 
-  const chain = { ...studionet, id: CHAIN_ID, rpcUrls: { default: { http: [RPC_URL] } } };
+  const chain = { ...studioDevnet, id: CHAIN_ID, rpcUrls: { default: { http: [RPC_URL] } } };
 
   // The wallet's own provider must be handed to the client, or there is
   // nothing to sign with and every write fails.
