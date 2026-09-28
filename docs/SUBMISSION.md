@@ -5,17 +5,27 @@ Everything a reviewer needs, in one place. Links verified reachable
 the one you believe is correct, since a single truncated character produces a
 404 that reads as "repo is private".
 
+> **DO NOT SUBMIT YET.** The two "Example case" links below resolve (HTTP 200)
+> but the app behind them is still built against the superseded contract
+> `0xfc34Ce61034952807899B8abE172BF76cC6036a0`, so they currently render that
+> contract's cases, not the ones listed here. Update `VITE_CONTRACT_ADDRESS`
+> on Vercel project `non` (`prj_BSllTlgiytCUcdO6GAWHTUKkFOR0`) to
+> `0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`, redeploy, and confirm
+> https://non-omega.vercel.app/app reads the new address before submitting.
+> The explorer and GitHub links above are already correct and safe to submit.
+
 ## Evidence fields
 
 | Field | Value |
 | --- | --- |
 | GitHub | https://github.com/Fortune9thx/non |
 | Live app | https://non-omega.vercel.app |
-| Contract (explorer) | https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0 |
-| Deploy tx | https://explorer-studio-dev.genlayer.com/tx/0xe16cc1269e082ddd23fd4a4d53fcbcf7719385023ef136051af86294dfe74167 |
+| Contract (explorer) | https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c |
+| Deploy tx | https://explorer-studio-dev.genlayer.com/tx/0xec59d576564b52f5c5919f75f3e8e4cffb7aff2165224c776d8282a6ff3b4930 |
 | Network | GenLayer Studio Next, chain id 61997 |
-| Example case (APPROVE) | https://non-omega.vercel.app/app/cases/NON-000002 |
-| Example case (INCONCLUSIVE) | https://non-omega.vercel.app/app/cases/NON-000001 |
+| Example case (APPROVE, 100/100/0) | https://non-omega.vercel.app/app/cases/NON-000002 |
+| Example case (APPROVE, 95/92/5) | https://non-omega.vercel.app/app/cases/NON-000001 |
+| `expire_case` auth refused live | https://explorer-studio-dev.genlayer.com/tx/0xd96eb029130f0eb9d22fb4571c3d393b1babe8ee89f7ca6b1f046d0de9a9a66d |
 
 ## Notes field
 
@@ -37,8 +47,9 @@ Plain text, 952 characters. Paste verbatim.
 > challenger's. INCONCLUSIVE and REVISE refund exactly, no fee. A stuck case
 > expires after 72h and returns every bond.
 >
-> Live: two real bonded cases adjudicated (NON-000002 APPROVE; NON-000001
-> INCONCLUSIVE, the fail-closed path firing live). 170 tests, lint clean.
+> Live: two real bonded cases adjudicated (NON-000001 and NON-000002, both
+> APPROVE). A non-party calling expire_case was refused on chain with "not a
+> party to this case". 107 pure-logic tests pass, lint clean.
 
 ## What GenLayer decides
 
@@ -56,15 +67,26 @@ each validator fetches for itself. Neither is computable from on-chain data.
 
 ## Known limitations, stated up front
 
-- `finalize`, `claim`, `challenge` and `expire_case` have not run on chain
-  yet: the appeal window is 6h and the expiry window 72h, and neither floor is
-  loosenable. All are fully covered in gltest against a real GenVM sandbox,
-  with value conservation asserted on every branch.
+- `finalize`, `claim` and `challenge` have not run on chain yet: the appeal
+  window is 6h and its floor is not loosenable. All are covered in gltest
+  against a real GenVM sandbox, with value conservation asserted on every
+  branch.
+- `expire_case` has run on chain only in its **refusal** path: a non-party was
+  rejected live with `not a party to this case`. A *successful* expiry still
+  needs a case stuck for 72h, so the refund arithmetic and the `REVIEWING`
+  branch remain unproven live.
+- The `tests/direct` suite could not be executed for this release: its pinned
+  GenVM runner asset returns HTTP 404 upstream. 107 pure-logic tests were
+  executed and pass; the 170 figure describes the full suite, not this run.
 - No adverse verdict (REJECT/REVISE) has been produced live.
-- Live LLM output is non-deterministic. NON-000001 is a real instance:
-  `exec_prompt` returned something unparseable, and the contract collapsed it
-  to INCONCLUSIVE rather than guessing. This is the designed response, not a
-  defect — but it means a caller should expect to retry.
+- Live LLM output is non-deterministic, and this project has observed it
+  directly: the superseded deploy produced an INCONCLUSIVE on this exact
+  proposal because `exec_prompt` returned something unparseable and the
+  contract collapsed it rather than guessing, while the current deploy
+  produced APPROVE on both runs, with `fit_score` differing (92 and 100) on
+  identical input. The fail-closed collapse is the designed response, not a
+  defect — but it means a caller should expect to retry, and it is covered in
+  `tests/unit` rather than being re-summoned on demand here.
 - Studio Next state can be reset by its operators, destroying all cases.
 - The CI `genvm` job is allowed to fail: on a cold runner the published GenVM
   archive's index does not contain the `py-genlayer` runner tarball for the

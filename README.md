@@ -66,11 +66,11 @@ by default.
 - **Network:** GenLayer Studio Dev / Studio Next, chain id **61997**
 - **RPC:** `https://studio-dev.genlayer.com/api`
 - **Explorer:** `https://explorer-studio-dev.genlayer.com`
-- **App:** [https://non-omega.vercel.app](https://non-omega.vercel.app) — live, reading the contract above
-- **Contract address:** [`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0) — **live**, verified by
-  `gen_getContractSchema` (14 methods) and a real on-chain read of
+- **App:** [https://non-omega.vercel.app](https://non-omega.vercel.app) — live, but still built against the superseded address until `VITE_CONTRACT_ADDRESS` is updated on Vercel and redeployed
+- **Contract address:** [`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`](https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c) — **live**, verified by
+  `gen_getContractSchema` (15 methods) and a real on-chain read of
   `get_config`. Deploy tx
-  [`0xe16cc1269e082ddd…`](https://explorer-studio-dev.genlayer.com/tx/0xe16cc1269e082ddd23fd4a4d53fcbcf7719385023ef136051af86294dfe74167).
+  [`0xec59d576564b52f5…`](https://explorer-studio-dev.genlayer.com/tx/0xec59d576564b52f5c5919f75f3e8e4cffb7aff2165224c776d8282a6ff3b4930).
 
 Studio Next is a development network. Its operators can reset it; if that
 happens, deployed contracts and every case in them are gone and the protocol
@@ -80,7 +80,7 @@ must be redeployed. This is stated in the UI, not buried here.
 
 ```bash
 pip install genlayer-test genvm-linter Pillow pytest
-python -m pytest tests -q
+python -m pytest tests/unit -q -p no:gltest
 ```
 
 170 tests, in two layers:

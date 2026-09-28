@@ -294,7 +294,7 @@ canonical outcomes, and cannot move money without a second node agreeing.
 ## Known limits and unproven claims
 
 1. **A full case has not been settled on chain.** The contract is live at
-   `0xfc34Ce61034952807899B8abE172BF76cC6036a0` and one real case, `NON-000001`, was opened with a 2 GEN bond and
+   `0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c` and one real case, `NON-000001`, was opened with a 2 GEN bond and
    adjudicated live — real HTTPS fetches, a real prompt, and validator
    consensus. What has *not* run on chain is `finalize` and `claim`: the
    appeal window is six hours and its floor is deliberately not loosenable, so

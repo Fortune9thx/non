@@ -4,13 +4,17 @@
     "chain_id": 61997,
     "rpc": "https://studio-dev.genlayer.com/api",
     "explorer": "https://explorer-studio-dev.genlayer.com",
-    "address": "0xfc34Ce61034952807899B8abE172BF76cC6036a0",
-    "deploy_tx": "0xe16cc1269e082ddd23fd4a4d53fcbcf7719385023ef136051af86294dfe74167",
+    "address": "0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c",
+    "deploy_tx": "0xec59d576564b52f5c5919f75f3e8e4cffb7aff2165224c776d8282a6ff3b4930",
     "treasury": "0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537",
     "app": "https://non-omega.vercel.app",
-    "verified_live_at": "2026-09-27",
-    "verified_by": "gen_getContractSchema returned 15 methods; get_config returned the expected constants; two real bonded cases were opened and adjudicated live (NON-000002 APPROVE, NON-000001 INCONCLUSIVE)",
+    "verified_live_at": "2026-09-28",
+    "verified_by": "gen_getContractSchema returned 15 methods including expire_case; get_config returned the expected constants (2/2/1 GEN bonds, 21600s appeal, 259200s expiry, 200 bps, 42-char treasury); a non-party calling expire_case on funded OPEN case NON-000001 was refused on chain with 'not a party to this case' (tx 0xd96eb029130f0eb9d22fb4571c3d393b1babe8ee89f7ca6b1f046d0de9a9a66d, FINISHED_WITH_ERROR, case left OPEN); two real bonded cases were opened and adjudicated live (NON-000001 APPROVE, NON-000002 APPROVE)",
     "superseded": [
+      {
+        "address": "0xfc34Ce61034952807899B8abE172BF76cC6036a0",
+        "reason": "expire_case was unauthenticated: guarded only by case state and the clock, so any address could permanently end a funded case 72h after it opened. REVIEWING also had no expiry path. Both fixed in d246f1d and deployed to the address above."
+      },
       {
         "address": "0x235c4fAeDd0F8427732231B2D4CBBCB62035aa76",
         "reason": "CaseOpened declared 4 indexed event fields; ABI.EVENT_MAX_TOPICS is 4 INCLUDING the signature topic, so open_case aborted on chain with SystemError: 2: inval."
@@ -19,6 +23,8 @@
         "address": "0xb263b7E8972D243639F797948A3322cE1Ca657dc",
         "reason": "Pre-audit. Lacked the bounded expiry escape hatch, and did not bind the agreed envelope to the case id or its locked evidence urls."
       }
-    ]
+    ],
+    "owner": "0x49fe058A588f2515Ad75D47B989114390B05eaC4",
+    "owner_note": "Deployed from an ephemeral key generated in CI and funded via sim_fundAccount; that key was not retained. `owner` therefore has no live holder. This is contained: `treasury` and the core-grants scope `admin` are both constructor/parameter values set to 0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537, so fee destination and constitution control are unaffected. `owner` only grants set_constitution on scopes the caller does not already admin."
   }
 }

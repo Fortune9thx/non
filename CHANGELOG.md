@@ -2,6 +2,42 @@
 
 All notable changes to Non are recorded here.
 
+## [1.1.0] — 2026-09-28
+
+Redeployed to GenLayer Studio Next (chain 61997) at
+`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`, superseding
+`0xfc34Ce61034952807899B8abE172BF76cC6036a0`.
+
+### Fixed
+- **`expire_case` was unauthenticated.** Its only guards were the case state
+  and the clock, so any address — no bond, no evidence, no validator review —
+  could permanently end any funded case 72 hours after it opened. It is now
+  bound to the parties whose bonds are locked in the case: the proposer alone
+  while unchallenged, proposer or challenger once challenged. Unauthorised
+  callers get `not a party to this case`.
+- **`REVIEWING` had no expiry path.** It is now covered in both expiry
+  branches, with re-evaluation dated from the challenge rather than the
+  original open.
+
+### Verified on chain
+- `gen_getContractSchema` returns 15 methods including `expire_case`.
+- `get_config` returns the expected constants with a clean 42-character
+  treasury address.
+- A non-party calling `expire_case` on funded, OPEN case `NON-000001` was
+  refused with `not a party to this case`, leaving the case untouched.
+- `core-grants` v1.0 re-pinned, with `rules_text` and `rules_json` byte
+  identical to the superseded contract's.
+- Two real bonded cases opened and adjudicated: `NON-000001` APPROVE
+  (95 / fit 92 / risk 5) and `NON-000002` APPROVE (100 / fit 100 / risk 0).
+
+### Notes
+- Deployed from an ephemeral key funded via `sim_fundAccount`, so `owner` has
+  no live holder. `treasury` and the `core-grants` scope `admin` were both set
+  to `0xC6E6d3b2acCaECeCeB40Ad4bD3dF123DDCB4e537`, so fee destination and
+  constitution control are unaffected.
+- `tests/direct` could not be executed: its pinned GenVM runner asset returns
+  HTTP 404 upstream. 107 pure-logic tests pass.
+
 ## [1.0.0] — 2026-09-27
 
 Initial build. **Deployed and verified live on GenLayer Studio Next**

@@ -6,7 +6,7 @@ Non is a bonded constitutional tribunal on GenLayer. Validators independently
 re-fetch HTTPS evidence and decide whether a proposal satisfies a pinned
 constitution. Outcomes are APPROVE, REJECT, REVISE, or INCONCLUSIVE. Proposer
 and challenger bonds make false verdicts costly. INCONCLUSIVE refunds bonds
-exactly. Live at `0xfc34Ce61034952807899B8abE172BF76cC6036a0` on chain 61997 Studio Next; state may reset.
+exactly. Live at `0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c` on chain 61997 Studio Next; state may reset.
 
 ## The contested claim
 
@@ -51,17 +51,23 @@ One-way, toward the outcome that moves no money.
 ## Status
 
 **Live on Studio Next (chain 61997)** at
-[`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0), verified by `gen_getContractSchema` and a
+[`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`](https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c), verified by `gen_getContractSchema` and a
 real on-chain `get_config` read.
 
-One real case, **NON-000001**, has been opened with a 2 GEN bond and
-adjudicated live: both evidence URLs fetched over HTTPS, a real prompt run,
-and validator consensus reached on an **APPROVE**. It is viewable at
-https://non-omega.vercel.app/app/cases/NON-000001.
+Two real cases, **NON-000001** and **NON-000002**, have each been opened with a
+2 GEN bond and adjudicated live: both evidence URLs fetched over HTTPS, a real
+prompt run, and validator consensus reached on an **APPROVE** in both. The
+`expire_case` authentication fix was also proven live — a non-party calling it
+was refused with `not a party to this case`, leaving the case untouched.
+
+Note that the deployed app still points at the superseded contract until
+`VITE_CONTRACT_ADDRESS` is updated on Vercel, so the per-case app links show
+the old contract's data for now.
 
 What is **not** yet proven on chain: `finalize` and `claim`, because the
 six-hour appeal window's floor is deliberately not loosenable, so no bond has
-actually been paid out yet. Challenge, re-evaluation, and the three adverse
+actually been paid out yet. A *successful* `expire_case` still needs a case
+stuck for 72 hours. Challenge, re-evaluation, and the three adverse
 outcomes are likewise gltest-only so far. Every branch of the bond ledger is
 proven there with value conservation asserted. See [`STATUS.md`](STATUS.md)
 for exactly what was run and what it does not cover.
@@ -76,7 +82,7 @@ for exactly what was run and what it does not cover.
 | Lint | `genvm-lint check build/Non.bundled.py` — clean |
 | Architecture | [`architecture.md`](architecture.md) |
 | Self-audit | [`audit.md`](audit.md) — including two real bugs caught pre-deploy |
-| Live contract | [`0xfc34Ce61034952807899B8abE172BF76cC6036a0`](https://explorer-studio-dev.genlayer.com/address/0xfc34Ce61034952807899B8abE172BF76cC6036a0) |
+| Live contract | [`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`](https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c) |
 | Explorer | https://explorer-studio-dev.genlayer.com |
 
 ## What a reviewer should look at first
