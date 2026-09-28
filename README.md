@@ -127,6 +127,34 @@ because `studio_devnet` has no `accounts` key.
   web/LLM mocks swapped underneath it, so validator independence is executed,
   not just asserted.
 
+### Checking the live deployment
+
+One command verifies the build, the contract on chain, and the deployed app
+together — reading the address from `deploy/deployments.json`, so it can never
+drift from what is actually deployed:
+
+```bash
+npm --prefix frontend ci      # once, for genlayer-js
+node scripts/e2e_check.mjs
+```
+
+It checks the bundle (size, LF-only, 15 public methods, bare `Depends`
+header), that the RPC really is chain 61997, that `gen_getContractSchema`
+returns 15 methods including `expire_case`, that `get_config` matches the
+protocol constants with an uncorrupted treasury, that `core-grants` v1.0 is
+pinned and every case reads back, and that the **deployed app's JavaScript
+carries the live address and no superseded one**.
+
+That last check is the one worth having. The address is inlined at build time,
+so a stale `VITE_CONTRACT_ADDRESS` on the host produces an app that silently
+serves a previous contract's cases — invisible everywhere except in the
+shipped bundle. Exits non-zero on any failure.
+
+This is deliberately **not** part of the must-pass CI: it depends on a live
+development network whose operators can reset it, and a red mark there would
+mean "the devnet moved", not "the code is wrong". Run it before a release or a
+submission.
+
 Lint the deployable bundle:
 
 ```bash
@@ -149,6 +177,7 @@ commands above; `docs/STATUS.md` records the results.
 contracts/    non_lib.py (pure logic, no genlayer import) + Non.py
 scripts/      build_bundle.py — produces the single deployable file
               check_line_endings.py — LF-only gate, enforced in CI
+              e2e_check.mjs — build + live contract + deployed app, one command
 tests/        unit/ (107, plain pytest) + direct/ (70, gltest, real GenVM)
 docs/         architecture · audit · STEWARD · STATUS · SUBMISSION
 deploy/       deployments.json — the live address, and every superseded one

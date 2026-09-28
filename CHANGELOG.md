@@ -30,6 +30,15 @@ Redeployed to GenLayer Studio Next (chain 61997) at
 - Two real bonded cases opened and adjudicated: `NON-000001` APPROVE
   (95 / fit 92 / risk 5) and `NON-000002` APPROVE (100 / fit 100 / risk 0).
 
+### Added
+- `scripts/e2e_check.mjs` — a single command that verifies the build, the live
+  contract and its state, and that the **deployed app's JavaScript carries the
+  live address and no superseded one**. It reads the address from
+  `deploy/deployments.json` so it cannot drift, and exits non-zero on failure.
+  Both failure modes were confirmed to fail: a stale app address and an
+  unreachable contract. Not wired into the must-pass CI, because it depends on
+  a development network whose operators can reset it.
+
 ### Documentation and repository hygiene
 - Corrected the test counts, which were wrong and internally inconsistent:
   the suite is **177** (107 unit + 70 direct), not 170, and the README's own

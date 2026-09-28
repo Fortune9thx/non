@@ -68,6 +68,8 @@ Local:
   every network in `gltest.config.yaml` and blocks collection because
   `studio_devnet` has no `accounts` key.)
 - `tests/direct` not executed — pinned runner 404, see above.
+- `node scripts/e2e_check.mjs` → 22 checks passed, covering the build, the
+  live contract, its state, and the deployed app's own JavaScript.
 - `genvm-lint check build/Non.bundled.py` → lint + validation pass.
 - `npm run build` in `frontend/` → clean; `tsc -b --noEmit` clean.
 
