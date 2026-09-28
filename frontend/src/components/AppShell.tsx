@@ -6,6 +6,7 @@ import {
   fmtGen,
   getBalance,
   injectedProvider,
+  onWalletDiscovered,
   probeLiveness,
   shortAddr,
   type Liveness,
@@ -53,6 +54,15 @@ export default function AppShell() {
     });
   }, []);
 
+  // Bumped when a wallet announces itself after mount, so the effect below
+  // re-runs and binds to a provider that did not exist on the first pass.
+  const [walletEpoch, setWalletEpoch] = useState(0);
+
+  useEffect(
+    () => onWalletDiscovered(() => setWalletEpoch((n) => n + 1)),
+    []
+  );
+
   useEffect(() => {
     refreshWallet();
     const provider = injectedProvider();
@@ -64,7 +74,7 @@ export default function AppShell() {
       provider.removeListener?.("accountsChanged", handler);
       provider.removeListener?.("chainChanged", handler);
     };
-  }, [refreshWallet]);
+  }, [refreshWallet, walletEpoch]);
 
   const onConnect = async () => {
     setConnecting(true);

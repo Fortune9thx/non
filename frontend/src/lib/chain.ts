@@ -247,9 +247,66 @@ type Eip1193 = {
   removeListener?: (event: string, handler: (...a: unknown[]) => void) => void;
 };
 
+/**
+ * Wallet discovery.
+ *
+ * `window.ethereum` is a single global slot that every injected wallet
+ * races to claim. With more than one extension installed (MetaMask +
+ * Coinbase Wallet + Phantom is a common setup) only one of them can own
+ * it, so reading that global alone silently misses every other wallet --
+ * and which one wins can change between page loads. EIP-6963 replaces the
+ * race with an announcement protocol: each wallet announces itself, and
+ * the page collects them.
+ *
+ * `window.ethereum` stays as a fallback for wallets that only support the
+ * legacy path. Discovery also has to tolerate an announce arriving after
+ * this module has loaded -- injection is an async content script, not
+ * something guaranteed to have run by the time React mounts -- so
+ * `onWalletDiscovered` lets the UI re-render when a late wallet appears.
+ */
+
+type Eip6963Detail = {
+  info: { uuid: string; name: string };
+  provider: Eip1193;
+};
+
+const discovered = new Map<string, Eip1193>();
+const walletListeners = new Set<() => void>();
+
+if (typeof window !== "undefined") {
+  window.addEventListener("eip6963:announceProvider", ((
+    event: CustomEvent<Eip6963Detail>
+  ) => {
+    const { info, provider } = event.detail ?? ({} as Eip6963Detail);
+    if (!info?.uuid || !provider) return;
+    const isNew = !discovered.has(info.uuid);
+    discovered.set(info.uuid, provider);
+    if (isNew) walletListeners.forEach((fn) => fn());
+  }) as EventListener);
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+}
+
+/**
+ * Re-runs `fn` when a wallet is discovered after this call. Returns an
+ * unsubscribe function.
+ */
+export function onWalletDiscovered(fn: () => void): () => void {
+  walletListeners.add(fn);
+  return () => {
+    walletListeners.delete(fn);
+  };
+}
+
 export function injectedProvider(): Eip1193 | null {
+  if (typeof window === "undefined") return null;
+  const first = discovered.values().next();
+  if (!first.done) return first.value;
   const w = window as unknown as { ethereum?: Eip1193 };
   return w.ethereum ?? null;
+}
+
+export function hasWallet(): boolean {
+  return injectedProvider() !== null;
 }
 
 export async function connectWallet(): Promise<string> {
