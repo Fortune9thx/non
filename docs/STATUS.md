@@ -21,16 +21,11 @@ _Last updated: 2026-09-28 — redeployed after the `expire_case` authentication 
 | Pinned runner | `py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng` |
 | `genvm-lint check` | Passes (3 checks) + validation passes, 15 methods |
 
-**`VITE_CONTRACT_ADDRESS` has NOT yet been updated on Vercel.** The repository
-files (`frontend/.env.example`, `.env.example`) point at the new address, but
-the deployed app at https://non-omega.vercel.app is still built against the
-superseded `0xfc34Ce61034952807899B8abE172BF76cC6036a0` and therefore still
-shows that contract's cases. A git push alone does not fix this: the build
-reads `VITE_CONTRACT_ADDRESS` from the Vercel project's environment, so that
-variable must be changed on project `non`
-(`prj_BSllTlgiytCUcdO6GAWHTUKkFOR0`) and a redeploy triggered. **Until that is
-done, every app link in `docs/SUBMISSION.md` points at stale data and must not
-be submitted as evidence.**
+`VITE_CONTRACT_ADDRESS` on Vercel project `non` was updated to the address
+above and the site redeployed without build cache on 2026-09-28. Verified by
+fetching the served bundle: it contains the new address and no occurrence of
+the superseded one, with chain id 61997 and the studio-dev RPC baked in. The
+app links in `docs/SUBMISSION.md` are therefore live and submittable.
 
 If the address stops resolving — Studio Next state can be reset by its
 operators — the frontend detects that and renders its real empty state rather

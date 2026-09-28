@@ -60,10 +60,6 @@ prompt run, and validator consensus reached on an **APPROVE** in both. The
 `expire_case` authentication fix was also proven live — a non-party calling it
 was refused with `not a party to this case`, leaving the case untouched.
 
-Note that the deployed app still points at the superseded contract until
-`VITE_CONTRACT_ADDRESS` is updated on Vercel, so the per-case app links show
-the old contract's data for now.
-
 What is **not** yet proven on chain: `finalize` and `claim`, because the
 six-hour appeal window's floor is deliberately not loosenable, so no bond has
 actually been paid out yet. A *successful* `expire_case` still needs a case

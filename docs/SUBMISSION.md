@@ -5,15 +5,6 @@ Everything a reviewer needs, in one place. Links verified reachable
 the one you believe is correct, since a single truncated character produces a
 404 that reads as "repo is private".
 
-> **DO NOT SUBMIT YET.** The two "Example case" links below resolve (HTTP 200)
-> but the app behind them is still built against the superseded contract
-> `0xfc34Ce61034952807899B8abE172BF76cC6036a0`, so they currently render that
-> contract's cases, not the ones listed here. Update `VITE_CONTRACT_ADDRESS`
-> on Vercel project `non` (`prj_BSllTlgiytCUcdO6GAWHTUKkFOR0`) to
-> `0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`, redeploy, and confirm
-> https://non-omega.vercel.app/app reads the new address before submitting.
-> The explorer and GitHub links above are already correct and safe to submit.
-
 ## Evidence fields
 
 | Field | Value |

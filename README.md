@@ -66,7 +66,7 @@ by default.
 - **Network:** GenLayer Studio Dev / Studio Next, chain id **61997**
 - **RPC:** `https://studio-dev.genlayer.com/api`
 - **Explorer:** `https://explorer-studio-dev.genlayer.com`
-- **App:** [https://non-omega.vercel.app](https://non-omega.vercel.app) — live, but still built against the superseded address until `VITE_CONTRACT_ADDRESS` is updated on Vercel and redeployed
+- **App:** [https://non-omega.vercel.app](https://non-omega.vercel.app) — live, reading the contract above
 - **Contract address:** [`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`](https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c) — **live**, verified by
   `gen_getContractSchema` (15 methods) and a real on-chain read of
   `get_config`. Deploy tx
