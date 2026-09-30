@@ -31,6 +31,16 @@ const EXPECTED_CONFIG = {
   protocol_fee_bps: 200,
 };
 
+/** Status code for a URL, following redirects. Never throws. */
+async function head(url) {
+  try {
+    const res = await fetch(url, { redirect: "follow" });
+    return res.status;
+  } catch {
+    return 0;
+  }
+}
+
 const failures = [];
 const check = (label, ok, detail = "") => {
   console.log(`  [${ok ? "PASS" : "FAIL"}] ${label}${detail ? ` — ${detail}` : ""}`);
@@ -126,6 +136,33 @@ async function main() {
   check("app bundle carries the live address", js.includes(address));
   const stale = superseded.map((s) => s.address).filter((a) => js.includes(a));
   check("app bundle carries no superseded address", stale.length === 0, stale.join(", ") || "none");
+
+  // 6. Submission evidence links --------------------------------------
+  // Every URL is read out of docs/SUBMISSION.md itself, so this checks the
+  // exact strings that get pasted into the Portal rather than a copy that
+  // can drift from them. Two separate failures are worth catching here:
+  // a URL that 404s because it lost a character somewhere between being
+  // typed and being read back, and the explorer returning 5xx while the
+  // network itself is perfectly healthy. Either one gets an evidence field
+  // rejected, and neither is visible from any other check in this script.
+  console.log("\nSubmission evidence links");
+  const packet = readFileSync(new URL("docs/SUBMISSION.md", ROOT), "utf8");
+  const urls = [...new Set(
+    (packet.match(/https:\/\/[^\s`|)<>"]+/g) || [])
+      .map((u) => u.replace(/[.,]+$/, ""))
+  )];
+  check("submission packet lists evidence urls", urls.length > 0, `${urls.length} unique`);
+
+  for (const url of urls) {
+    // One retry: the explorer has been observed returning a transient 503
+    // while its own API and the RPC stayed up.
+    let status = await head(url);
+    if (status >= 500) {
+      await new Promise((r) => setTimeout(r, 3000));
+      status = await head(url);
+    }
+    check(`${url} resolves`, status >= 200 && status < 400, String(status));
+  }
 
   console.log();
   if (failures.length) {
