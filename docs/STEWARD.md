@@ -62,14 +62,24 @@ was refused with `not a party to this case`, leaving the case untouched.
 
 Both cases have since been **finalized on chain** after their appeal windows
 expired, and the resulting bond ledger was read back and matched
-`settle_accounting`'s prediction exactly: 4 GEN to the proposer, 0 to the
-treasury, confirming live that the protocol fee applies to slashed bonds
-only. What is **not** proven on chain is `claim()`: the credited address is
-the retired deploy key, so nobody can call it for these cases. A *successful* `expire_case` still needs a case
-stuck for 72 hours. Challenge, re-evaluation, and the three adverse
-outcomes are likewise gltest-only so far. Every branch of the bond ledger is
-proven there with value conservation asserted. See [`STATUS.md`](STATUS.md)
-for exactly what was run and what it does not cover.
+`settle_accounting`'s prediction exactly: 4 GEN returned to the proposer, 0 to
+the treasury — live confirmation that the protocol fee applies to slashed
+bonds only.
+
+Four things remain **gltest-only**, and are stated here rather than left to be
+discovered:
+
+- **`claim()`** — the payout call. The bonds are credited to the retired
+  deploy key, so nobody can call it for these two cases.
+- **An adverse verdict.** Every live case so far returned APPROVE, so no bond
+  has actually been slashed on chain and the treasury has never been paid.
+- **`challenge` and re-evaluation** — a challenge must land inside a 6h window.
+- **A successful `expire_case`** — needs a case stuck for 72h. Only its
+  refusal path has run live.
+
+Every one of these is covered in gltest against a real GenVM sandbox, with
+value conservation asserted on each branch. See [`STATUS.md`](STATUS.md) for
+exactly what was run and what it does not cover.
 
 ## Evidence for review
 
@@ -80,7 +90,7 @@ for exactly what was run and what it does not cover.
 | Tests | 177 passing — `python -m pytest tests -q` (needs the GenVM runner cached; see STATUS.md) |
 | Lint | `genvm-lint check build/Non.bundled.py` — clean |
 | Architecture | [`architecture.md`](architecture.md) |
-| Self-audit | [`audit.md`](audit.md) — including two real bugs caught pre-deploy |
+| Self-audit | [`audit.md`](audit.md) — 12 findings across two adversarial rounds, including three that would have broken the product silently |
 | Live contract | [`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`](https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c) |
 | Explorer | https://explorer-studio-dev.genlayer.com |
 

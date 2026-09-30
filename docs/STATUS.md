@@ -1,6 +1,6 @@
 # Non — status
 
-_Last updated: 2026-09-28 — redeployed after the `expire_case` authentication fix, and verified live._
+_Last updated: 2026-09-30 — both cases settled on chain; second strict audit round applied._
 
 ## Contract
 
@@ -82,8 +82,9 @@ Local:
   network at collection time and blocks the run.)
 - `tests/direct` → 70 passed locally; not runnable from a cold checkout, see
   above.
-- `node scripts/e2e_check.mjs` → 22 checks passed, covering the build, the
-  live contract, its state, and the deployed app's own JavaScript.
+- `node scripts/e2e_check.mjs` → 33 checks passed, covering the build, the
+  live contract, its state, the deployed app's own JavaScript, and every
+  submission evidence url.
 - `genvm-lint check build/Non.bundled.py` → lint + validation pass.
 - `npm run build` in `frontend/` → clean; `tsc -b --noEmit` clean.
 
