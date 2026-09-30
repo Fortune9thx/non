@@ -60,9 +60,12 @@ prompt run, and validator consensus reached on an **APPROVE** in both. The
 `expire_case` authentication fix was also proven live — a non-party calling it
 was refused with `not a party to this case`, leaving the case untouched.
 
-What is **not** yet proven on chain: `finalize` and `claim`, because the
-six-hour appeal window's floor is deliberately not loosenable, so no bond has
-actually been paid out yet. A *successful* `expire_case` still needs a case
+Both cases have since been **finalized on chain** after their appeal windows
+expired, and the resulting bond ledger was read back and matched
+`settle_accounting`'s prediction exactly: 4 GEN to the proposer, 0 to the
+treasury, confirming live that the protocol fee applies to slashed bonds
+only. What is **not** proven on chain is `claim()`: the credited address is
+the retired deploy key, so nobody can call it for these cases. A *successful* `expire_case` still needs a case
 stuck for 72 hours. Challenge, re-evaluation, and the three adverse
 outcomes are likewise gltest-only so far. Every branch of the bond ledger is
 proven there with value conservation asserted. See [`STATUS.md`](STATUS.md)

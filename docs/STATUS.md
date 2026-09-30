@@ -111,6 +111,35 @@ The frontend was then pointed at the live address and confirmed reading real
 state: the network chip goes green, `get_config` populates the bond and window
 chips, and both cases render with their real verdicts and evidence.
 
+## Bond ledger settled on chain (2026-09-30)
+
+Both appeal windows expired, and both cases were finalized with a real
+permissionless `finalize` call — the first time the settlement path has run on
+the live network.
+
+| | |
+| --- | --- |
+| NON-000001 | [`0x768e54f9d9…`](https://explorer-studio-dev.genlayer.com/tx/0x768e54f9d9b7f48fd32a3a84d25a8db298f6649922da9d1c5f9e117457f94c02) — `FINISHED_WITH_RETURN` |
+| NON-000002 | [`0xcb30c21502…`](https://explorer-studio-dev.genlayer.com/tx/0xcb30c21502604f113cf22dff3e99b375355462ca6608602ab7f016427ae66e28) — `FINISHED_WITH_RETURN` |
+
+Both cases now read `state: FINAL`, `settled: true`. The ledger the calls
+wrote was then read back and checked against what `settle_accounting` predicts
+for two unchallenged APPROVEs:
+
+| Address | Expected | On chain |
+| --- | --- | --- |
+| Proposer | 4 GEN (2 × the review bond, returned in full) | **4.000000000 GEN** |
+| Treasury | 0 (the protocol fee applies to slashed bonds only) | **0** |
+
+That second row is the one worth reading twice: it is the live confirmation
+that an approval costs the proposer nothing, because the fee is charged on a
+forfeiture and nowhere else.
+
+`claim()` cannot be demonstrated for these two cases — the credited address is
+the ephemeral deploy key described above, which was not retained. The payout
+call itself is covered in gltest, where it is exercised directly rather than
+mocked.
+
 ## Live cases
 
 Two real cases were opened with genuine 2 GEN bonds and adjudicated on chain
@@ -152,11 +181,11 @@ Viewable at https://non-omega.vercel.app/app.
 
 ## Not yet done
 
-- **`finalize` and `claim` have not run on chain.** The appeal window is six
-  hours and its floor is deliberately not loosenable (an operator can only
-  make Non stricter), so both cases must age out first. Every branch of the
-  bond ledger is proven in gltest with value conservation asserted, but no
-  bond has actually been paid out on chain yet.
+- **`claim` has not run on chain.** `finalize` now has (see below), and the
+  bond ledger it wrote is verifiable by a read — but the credited party is
+  the retired deploy key, so nobody can call `claim()` for these two cases.
+  The payout itself is proven only in gltest, where `claim()` is exercised
+  directly against `emit_transfer`.
 - **`expire_case`'s refusal path has now run on chain; its settlement path has
   not.** A non-party was rejected live with `not a party to this case` (above),
   which is the fix this redeploy exists for. What has *not* run on chain is a
