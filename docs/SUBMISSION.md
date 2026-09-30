@@ -88,7 +88,6 @@ each validator fetches for itself. Neither is computable from on-chain data.
   and has to be downloaded on first use — so CI marks that job
   `continue-on-error`. The pure-logic suite imports no GenLayer code and runs
   anywhere.
-- No adverse verdict (REJECT/REVISE) has been produced live.
 - Live LLM output is non-deterministic, and this project has observed it
   directly: the superseded deploy produced an INCONCLUSIVE on this exact
   proposal because `exec_prompt` returned something unparseable and the
