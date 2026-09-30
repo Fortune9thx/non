@@ -74,7 +74,7 @@ for exactly what was run and what it does not cover.
 | --- | --- |
 | Source | `contracts/non_lib.py`, `contracts/Non.py` |
 | Deployable bundle | `build/Non.bundled.py` — `Depends` on line 1, no prose above it |
-| Tests | 144 passing — `python -m pytest tests -q` |
+| Tests | 177 passing — `python -m pytest tests -q` (needs the GenVM runner cached; see STATUS.md) |
 | Lint | `genvm-lint check build/Non.bundled.py` — clean |
 | Architecture | [`architecture.md`](architecture.md) |
 | Self-audit | [`audit.md`](audit.md) — including two real bugs caught pre-deploy |

@@ -21,7 +21,7 @@ const FILTERS = [
 const VERDICTS = ["", "approve", "reject", "revise", "inconclusive"];
 
 export default function Cases() {
-  const { isLive, account } = useOutletContext<AppContext>();
+  const { isLive, account, checking } = useOutletContext<AppContext>();
   const [cases, setCases] = useState<CaseRecord[] | null>(null);
   const [error, setError] = useState("");
   const [state, setState] = useState("");
@@ -30,6 +30,7 @@ export default function Cases() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
+    if (checking) return;
     if (!isLive) {
       setCases([]);
       return;
@@ -46,7 +47,7 @@ export default function Cases() {
     return () => {
       cancelled = true;
     };
-  }, [isLive]);
+  }, [isLive, checking]);
 
   const rows = useMemo(() => {
     const all = cases ?? [];
@@ -131,7 +132,7 @@ export default function Cases() {
         ) : rows.length === 0 ? (
           <Empty>
             {(cases ?? []).length === 0
-              ? `No cases on chain yet.${isLive ? "" : " The protocol is not live on this network."}`
+              ? `No cases on chain yet.${isLive || checking ? "" : " The protocol is not live on this network."}`
               : "No cases match these filters."}
           </Empty>
         ) : (

@@ -20,7 +20,7 @@ type Busy = "" | "evaluate" | "challenge" | "finalize" | "expire";
 
 export default function CaseTicket() {
   const { caseId = "" } = useParams();
-  const { isLive, account, refreshWallet } = useOutletContext<AppContext>();
+  const { isLive, account, refreshWallet, checking } = useOutletContext<AppContext>();
 
   const [record, setRecord] = useState<CaseRecord | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
@@ -72,6 +72,8 @@ export default function CaseTicket() {
       setBusy("");
     }
   };
+
+  if (checking) return <Loading label="Checking the network" />;
 
   if (!isLive) {
     return (

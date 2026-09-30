@@ -17,6 +17,8 @@ import { Seal } from "../art/Art";
 export type AppContext = {
   liveness: Liveness;
   isLive: boolean;
+  /** The probe has not answered yet — assert nothing about the chain. */
+  checking: boolean;
   account: string | null;
   balance: bigint;
   refreshWallet: () => void;
@@ -92,8 +94,12 @@ export default function AppShell() {
 
   const context: AppContext = useMemo(
     () => ({
-      liveness: liveness ?? { kind: "undeployed" },
+      // Until the probe answers, the state is genuinely unknown. Coercing
+      // that to "undeployed" made the app assert the protocol was not
+      // deployed on every page load, about a contract that is live.
+      liveness: liveness ?? { kind: "checking" },
       isLive: liveness?.kind === "live",
+      checking: liveness === null,
       account,
       balance,
       refreshWallet,

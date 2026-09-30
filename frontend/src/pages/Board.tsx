@@ -22,12 +22,13 @@ import {
  * no seeded TVL anywhere in this file.
  */
 export default function Board() {
-  const { isLive } = useOutletContext<AppContext>();
+  const { isLive, checking } = useOutletContext<AppContext>();
   const [cases, setCases] = useState<CaseRecord[] | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (checking) return;      // wait for the probe before deciding
     if (!isLive) {
       setCases([]);
       return;
@@ -48,7 +49,7 @@ export default function Board() {
     return () => {
       cancelled = true;
     };
-  }, [isLive]);
+  }, [isLive, checking]);
 
   const now = Date.now() / 1000;
   const rows = cases ?? [];
@@ -116,7 +117,7 @@ export default function Board() {
         ) : rows.length === 0 ? (
           <Empty>
             No cases on chain yet.
-            {!isLive && " The protocol is not live on this network."}
+            {!isLive && !checking && " The protocol is not live on this network."}
           </Empty>
         ) : (
           <table className="table">

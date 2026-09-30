@@ -21,7 +21,7 @@ import {
  * than a per-case list of things to collect one at a time.
  */
 export default function Claims() {
-  const { isLive, account, refreshWallet } = useOutletContext<AppContext>();
+  const { isLive, account, refreshWallet, checking } = useOutletContext<AppContext>();
   const [owed, setOwed] = useState<bigint | null>(null);
   const [cases, setCases] = useState<CaseRecord[] | null>(null);
   const [error, setError] = useState("");
@@ -99,6 +99,8 @@ export default function Claims() {
       <div className="card">
         {!account ? (
           <Empty>Connect a wallet to see what you are owed.</Empty>
+        ) : checking ? (
+          <Loading label="Checking the network" />
         ) : !isLive ? (
           <Empty>The protocol is not live on this network.</Empty>
         ) : owed === null ? (

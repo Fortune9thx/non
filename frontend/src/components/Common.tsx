@@ -46,6 +46,8 @@ export function NetworkChip({ liveness }: { liveness: Liveness }) {
       ? "dot dot-live"
       : liveness.kind === "rpc-down"
       ? "dot dot-down"
+      : liveness.kind === "checking"
+      ? "dot"
       : "dot dot-warn";
   return (
     <span className="chip">
@@ -65,6 +67,9 @@ export function NetworkChip({ liveness }: { liveness: Liveness }) {
 
 export function LivenessBanner({ liveness }: { liveness: Liveness }) {
   if (liveness.kind === "live") return null;
+
+  // While the probe is in flight nothing is known yet, so nothing is claimed.
+  if (liveness.kind === "checking") return null;
 
   if (liveness.kind === "undeployed") {
     return (

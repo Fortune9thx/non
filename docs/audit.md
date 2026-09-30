@@ -1,7 +1,7 @@
 # Non — self-audit
 
 Written against the deployable bundle (`build/Non.bundled.py`) and the test
-suite at 128 passing tests, `genvm-lint check` clean.
+suite at 177 passing tests, `genvm-lint check` clean.
 
 This document records what was actually found and fixed, what is deliberately
 out of scope, and what remains unproven. It is not a claim that the contract
@@ -64,7 +64,7 @@ after a clean deploy, fixed and redeployed.**
 
 The first deploy was live and healthy, but `open_case` aborted on chain with
 `SystemError: 2: inval` inside `Event.emit_raw`. Two distinct SDK rules were
-being violated, and **gltest direct-mode reproduces neither** — all 170 tests
+being violated, and **gltest direct-mode reproduces neither** — all 177 tests
 passed against the broken code.
 
 **a. The topic budget counts the signature.** `ABI.EVENT_MAX_TOPICS` is 4, and
@@ -190,6 +190,77 @@ reaching a prompt is length-capped at the write that stores it; both the
 challenge-opening and finalize paths independently re-check the appeal window;
 self-dealing is rejected; no float ever reaches calldata; and the header is a
 bare `Depends` comment on line 1.
+
+## Second strict audit round (2026-09-30)
+
+A fresh adversarial pass against the same 188-item checklist, re-deriving every
+claim from the code and the live network rather than trusting the previous
+round's conclusions. Four findings, all fixed.
+
+### 8. The app asserted "not deployed" before its own probe answered
+
+**Severity: medium, and squarely aimed at the audience this is built for.**
+`AppShell` did `liveness ?? { kind: "undeployed" }`, so while the liveness
+probe was still in flight the UI rendered *"Not deployed. No contract address
+is configured"* and *"the protocol is not live on this network"* — about a
+contract that is live. On a slow RPC a reviewer sees that claim for seconds.
+
+This is the same error the board's stat tiles were already fixed for (showing
+`—` rather than `0` when the chain is unreadable): stating a fact that has not
+been established. `Liveness` now has an explicit `checking` state, the banner
+stays silent during it, and every page that previously asserted "not live"
+either waits or shows "Checking the network…".
+
+### 9. `register_scope` and `set_constitution` had no UI at all
+
+**Severity: medium — a named reviewer red flag.** Two of the eight write
+methods could only be called from the CLI, so a new operator could not create
+a scope or publish a constitution from the app; they could only read one
+somebody else had made. A contract method that exists but is never reachable
+from the UI is exactly the kind of gap a reviewer looks for. Added a scope
+administration panel on the constitution page, with the contract's own
+validation mirrored client-side.
+
+### 10. The success whitelist had a blacklist-shaped hole, and missed a field
+
+**Severity: medium.** Two problems in the transaction-outcome check:
+
+- `if (execution && !OK_EXECUTION.has(execution))` **skipped the check
+  entirely when the field was absent** — so a receipt carrying no execution
+  result counted as success. That is precisely the "treats every state it has
+  not heard of as success" failure the comment above it warned against.
+- The consensus result was never checked at all. `DISAGREE` means validators
+  independently re-ran the work and got different answers, so nothing was
+  persisted.
+
+Both fixed, and the field names were taken from a **real receipt off this
+network rather than guessed** — which mattered: the consensus result is
+`result_name` (snake_case), not the `resultName` that would have been the
+natural assumption, so the check would have read an always-missing field. The
+gate was then verified against two real transactions: a successful deploy
+(passes) and the refused `expire_case` (fails on `FINISHED_WITH_ERROR`), plus
+an empty receipt (now fails instead of passing).
+
+### 11. Documentation drift
+
+Three stale test counts, including `144 passing` in the **steward-facing**
+packet. Corrected to 177.
+
+### Checked again and still correct
+
+Re-derived, not assumed: one balance store only, with the treasury draining
+through the same claimable ledger; `emit_transfer` — the sole value-moving
+call — genuinely exercised by `claim()` tests; the validator unwraps
+`.calldata`, re-runs the whole job, and binds to the case id and rules
+version; the bundle matches its sources; sources are LF-only; and the Portal
+notes field is inside its limit.
+
+`expire_case`'s restriction to case parties was examined closely against the
+"escape hatch must be permissionless" guidance and judged **sound**: expiring
+a case moves it to FINAL permanently, so an unauthenticated version would let
+any stranger terminally halt a funded case on the clock alone. Each party can
+still exit alone, so neither is hostage to the other, and `evaluate_case`
+stays permissionless — only *ending* a case is restricted.
 
 ## Deliberate design decisions
 

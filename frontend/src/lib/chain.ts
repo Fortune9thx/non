@@ -23,6 +23,7 @@ export const NETWORK_LABEL = "Studio Next";
 
 /** How the app is currently connected to the protocol. */
 export type Liveness =
+  | { kind: "checking" }                // the probe has not answered yet
   | { kind: "undeployed" }              // no address configured
   | { kind: "no-code"; address: string } // address set, nothing deployed there
   | { kind: "rpc-down"; detail: string } // could not reach the RPC at all
@@ -405,24 +406,46 @@ export type WriteArgs = {
  */
 const OK_STATUS = new Set(["ACCEPTED", "FINALIZED"]);
 const OK_EXECUTION = new Set(["FINISHED_WITH_RETURN", "FINISHED_WITH_NO_RETURN"]);
+// The consensus result. `DISAGREE` means validators independently re-ran the
+// leader's work and got different answers, so nothing was persisted at all.
+const OK_RESULT = new Set(["MAJORITY_AGREE", "AGREE"]);
 
 export type TxOutcome = {
   hash: string;
   status: string;
   execution: string;
+  result: string;
   ok: boolean;
   reason: string;
 };
 
-function readStatus(receipt: unknown): { status: string; execution: string } {
+/**
+ * Pulls the three fields that decide whether a write actually took effect.
+ *
+ * Field names are taken from a real receipt off this network, not guessed:
+ * `statusName` and `txExecutionResultName` are camelCase, while the
+ * consensus result is `result_name` (snake_case). Both spellings are read
+ * for each so a shape change upstream degrades to "unknown" — which fails
+ * the whitelist — rather than to a silent pass.
+ */
+function readStatus(receipt: unknown): {
+  status: string;
+  execution: string;
+  result: string;
+} {
   const r = (receipt ?? {}) as Record<string, unknown>;
-  const status = String(
-    r.statusName ?? r.status_name ?? r.status ?? ""
-  ).toUpperCase();
-  const execution = String(
-    r.txExecutionResultName ?? r.tx_execution_result_name ?? ""
-  ).toUpperCase();
-  return { status, execution };
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = r[k];
+      if (typeof v === "string" && v) return v.toUpperCase();
+    }
+    return "";
+  };
+  return {
+    status: pick("statusName", "status_name"),
+    execution: pick("txExecutionResultName", "tx_execution_result_name"),
+    result: pick("result_name", "resultName"),
+  };
 }
 
 /**
@@ -455,37 +478,50 @@ export async function waitForOutcome(
       hash,
       status: "",
       execution: "",
+      result: "",
       ok: false,
       reason: err instanceof Error ? err.message : String(err),
     };
   }
 
-  const { status, execution } = readStatus(receipt);
+  const { status, execution, result } = readStatus(receipt);
+  const fail = (reason: string): TxOutcome => ({
+    hash,
+    status,
+    execution,
+    result,
+    ok: false,
+    reason,
+  });
+
+  // Every gate below is a whitelist, and a MISSING value fails it just like
+  // a known-bad one. Skipping a check when its field is absent is how a
+  // whitelist quietly turns back into a blacklist.
   if (!OK_STATUS.has(status)) {
-    return {
-      hash,
-      status,
-      execution,
-      ok: false,
-      reason:
-        status === "UNDETERMINED"
-          ? "Validators could not agree, so nothing was recorded. Try again."
-          : `Transaction ended as ${status || "an unknown state"}.`,
-    };
+    return fail(
+      status === "UNDETERMINED"
+        ? "Validators could not agree, so nothing was recorded. Try again."
+        : `Transaction ended as ${status || "an unreported state"}.`
+    );
   }
-  if (execution && !OK_EXECUTION.has(execution)) {
-    return {
-      hash,
-      status,
-      execution,
-      ok: false,
-      reason: `The contract rejected this call (${execution}).`,
-    };
+  if (!OK_RESULT.has(result)) {
+    return fail(
+      result === "DISAGREE"
+        ? "Validators re-ran this independently and disagreed, so nothing was recorded. Try again."
+        : `Consensus result was ${result || "not reported"}.`
+    );
+  }
+  if (!OK_EXECUTION.has(execution)) {
+    return fail(
+      execution === "FINISHED_WITH_ERROR"
+        ? "The contract rejected this call."
+        : `Execution result was ${execution || "not reported"}.`
+    );
   }
   if (finalized && status !== "FINALIZED") {
-    return { hash, status, execution, ok: false, reason: "Not yet final." };
+    return fail("Not yet final.");
   }
-  return { hash, status, execution, ok: true, reason: "" };
+  return { hash, status, execution, result, ok: true, reason: "" };
 }
 
 // ---------------------------------------------------------------------------
