@@ -88,7 +88,7 @@ Local:
 - `genvm-lint check build/Non.bundled.py` → lint + validation pass.
 - `npm run build` in `frontend/` → clean; `tsc -b --noEmit` clean.
 
-On chain (Studio Next, 2026-09-28):
+On chain (Studio Next, 2026-09-28, re-verified 2026-09-30):
 
 1. **Deploy** -> `ACCEPTED`, contract address above.
 2. **`gen_getContractSchema`** -> returns all **15 methods**. (`eth_getCode`
