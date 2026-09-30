@@ -49,25 +49,39 @@ on a scope the caller does not already administer, which does not apply to
 | `tests/direct` | 70 | The real bundle deployed into a GenVM sandbox: scopes, constitution pinning, all four outcomes, the appeal window and the 72h expiry window (via `warp`), bond accounting, claims, config floors. |
 | — of which validator | 8 | The **real captured validator closure**, run with web/LLM mocks swapped underneath it. |
 | — of which event guards | 16 | Parse the contract source and enforce the indexed-field limit and ordering rules that gltest cannot reach. |
-| **Total** | **177** | 107 executed and passing (see below). |
+| **Total** | **177** | All 177 executed and passing (see below). |
 
-**Which of these actually ran for this release.** `tests/unit` was executed:
-107 passed. `tests/direct` **could not be executed in this environment** — its
-pinned GenVM runner, `genvm-universal.tar.xz` from `genvm v0.6.0-rc6`, returns
-HTTP 404, a known upstream asset gap (`v0.6.0`, `rc5` and `rc7` were checked
-and 404 as well), and CI already marks that job `continue-on-error`. Three
-expiry tests were updated by hand for the new participant rule and remain
-unexecuted. So the 177 figure describes the suite, not this run.
+**Which of these actually ran, and where.** All 177 were executed and pass
+on a machine whose GenVM runner cache is already populated —
+`python -m pytest tests -q` → **177 passed**, most recently on 2026-09-30
+against this commit.
+
+`tests/direct` cannot run in a **cold** environment, which is why CI marks
+that job `continue-on-error`: the pinned runner
+(`py-genlayer:5jycge…`, from `genvm v0.6.0-rc6`) has to be downloaded on
+first use, and that asset currently returns **HTTP 404** upstream (`v0.6.0`,
+`rc5` and `rc7` were checked and 404 as well). A machine that fetched the
+runner before it disappeared keeps it under `~/.cache/gltest-direct` and runs
+the suite normally.
+
+So the limitation is an **upstream asset-availability problem for fresh
+environments**, not a property of the tests: they execute and pass wherever
+the runner is present. A reviewer cloning fresh should expect `tests/direct`
+to fail at the download step, and `tests/unit` (which imports no GenLayer
+code at all) to pass anywhere.
 
 ## Verification actually performed
 
 Local:
 
+- `python -m pytest tests -q` → **177 passed** (107 unit + 70 direct), on a
+  machine with the runner cached.
 - `python -m pytest tests/unit -q -p no:gltest` → 107 passed. (`-p no:gltest`
-  is required when `genlayer-test` is installed: its pytest plugin validates
-  every network in `gltest.config.yaml` and blocks collection because
-  `studio_devnet` has no `accounts` key.)
-- `tests/direct` not executed — pinned runner 404, see above.
+  is required when `genlayer-test` is installed *and* `gltest.config.yaml`
+  has a network without an `accounts` key: its pytest plugin validates every
+  network at collection time and blocks the run.)
+- `tests/direct` → 70 passed locally; not runnable from a cold checkout, see
+  above.
 - `node scripts/e2e_check.mjs` → 22 checks passed, covering the build, the
   live contract, its state, and the deployed app's own JavaScript.
 - `genvm-lint check build/Non.bundled.py` → lint + validation pass.

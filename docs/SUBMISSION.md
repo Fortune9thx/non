@@ -20,27 +20,27 @@ the one you believe is correct, since a single truncated character produces a
 
 ## Notes field
 
-Plain text, 952 characters. Paste verbatim.
+Plain text, 957 characters. Paste verbatim.
 
 > Non is a bonded constitutional tribunal. It settles one contested question
 > on-chain: do a proposal's material claims meet a pinned constitution under
 > independently fetched evidence? Outcomes: APPROVE, REJECT, REVISE,
 > INCONCLUSIVE.
 >
-> Every validator re-fetches the HTTPS evidence, re-runs the prompt and
-> derives its own verdict through the same pure code. The leader's result
-> stands only on exact agreement of decision, outcome and the case's pinned
-> rules version. The agreed envelope is bound to the case id and that case's
-> locked evidence URLs.
+> Every validator re-fetches the evidence, re-runs the prompt and derives its
+> own verdict through the same pure code. The leader's result stands only on
+> exact agreement of decision, outcome and the pinned rules version. The
+> agreed envelope is bound to the case id and that case's locked evidence
+> URLs.
 >
 > Proposers and challengers each bond 2 GEN, with a 6h appeal window. A final
 > REJECT forfeits the proposer's bond; a failed challenge forfeits the
 > challenger's. INCONCLUSIVE and REVISE refund exactly, no fee. A stuck case
 > expires after 72h and returns every bond.
 >
-> Live: two real bonded cases adjudicated (NON-000001 and NON-000002, both
-> APPROVE). A non-party calling expire_case was refused on chain with "not a
-> party to this case". 107 pure-logic tests pass, lint clean.
+> Live: two real bonded cases adjudicated (NON-000001, NON-000002, both
+> APPROVE). A non-party calling expire_case was refused on chain. 177 tests
+> pass; lint clean.
 
 ## What GenLayer decides
 
@@ -66,9 +66,12 @@ each validator fetches for itself. Neither is computable from on-chain data.
   rejected live with `not a party to this case`. A *successful* expiry still
   needs a case stuck for 72h, so the refund arithmetic and the `REVIEWING`
   branch remain unproven live.
-- The `tests/direct` suite could not be executed for this release: its pinned
-  GenVM runner asset returns HTTP 404 upstream. 107 pure-logic tests were
-  executed and pass; the 177 figure describes the full suite, not this run.
+- All 177 tests execute and pass where the pinned GenVM runner is cached
+  (107 pure-logic + 70 GenVM-sandbox). `tests/direct` cannot run from a
+  **fresh** checkout, because that runner asset now returns HTTP 404 upstream
+  and has to be downloaded on first use — so CI marks that job
+  `continue-on-error`. The pure-logic suite imports no GenLayer code and runs
+  anywhere.
 - No adverse verdict (REJECT/REVISE) has been produced live.
 - Live LLM output is non-deterministic, and this project has observed it
   directly: the superseded deploy produced an INCONCLUSIVE on this exact

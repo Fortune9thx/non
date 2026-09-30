@@ -84,6 +84,7 @@ Each of these was hit for real. Do not rediscover them.
 
 ```bash
 python scripts/build_bundle.py              # regenerate the deployable bundle
+python -m pytest tests -q                    # 177 tests (needs the runner cached)
 python -m pytest tests/unit -q               # 107 pure-logic tests, no SDK
 python scripts/check_line_endings.py         # LF-only gate, enforced in CI
 npm --prefix frontend ci                     # frontend deps (incl. genlayer-js)
@@ -93,10 +94,17 @@ node scripts/e2e_check.mjs                   # full live end-to-end check
 
 ## Known limitations — state these, never paper over them
 
-- **`tests/direct` has never executed** (trap 7). The suite is 177 tests
-  (107 unit + 70 direct); only the 107 have run. Three expiry tests written
-  for the current participant rule remain unexecuted. Say "107 executed",
-  not "177 pass".
+- **`tests/direct` needs the GenVM runner already cached** (trap 7). All 177
+  tests (107 unit + 70 direct) execute and pass on a machine whose
+  `~/.cache/gltest-direct` already holds the pinned runner — verified
+  2026-09-30. From a **cold** checkout the direct suite cannot run at all,
+  because that runner asset returns HTTP 404 upstream and has to be
+  downloaded on first use; that is why CI marks the job
+  `continue-on-error`. Check which situation you are in before describing it:
+  run the suite rather than assuming either outcome. "177 pass where the
+  runner is cached; the direct suite cannot run from a fresh clone" is the
+  accurate claim — do not downgrade it to "only 107 ran", and do not claim
+  177 pass from an environment where you have not run them.
 - **`owner` has no live holder.** The live contract was deployed from an
   ephemeral key that was not retained. Contained by design: `treasury` and the
   `core-grants` scope `admin` are both
