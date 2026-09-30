@@ -18,11 +18,13 @@ the one you believe is correct, since a single truncated character produces a
 | Example case (APPROVE, 95/92/5) | https://non-omega.vercel.app/app/cases/NON-000001 |
 | Bond ledger settled (NON-000001) | https://explorer-studio-dev.genlayer.com/tx/0x768e54f9d9b7f48fd32a3a84d25a8db298f6649922da9d1c5f9e117457f94c02 |
 | Bond ledger settled (NON-000002) | https://explorer-studio-dev.genlayer.com/tx/0xcb30c21502604f113cf22dff3e99b375355462ca6608602ab7f016427ae66e28 |
+| Example case (REJECT, false claims) | https://non-omega.vercel.app/app/cases/NON-000003 |
+| REJECT adjudication tx | https://explorer-studio-dev.genlayer.com/tx/0x6d62a6bea80a3db2fb9b36af91a5b3cc4fddee139fbc7f7b575c35e778767de5 |
 | `expire_case` auth refused live | https://explorer-studio-dev.genlayer.com/tx/0xd96eb029130f0eb9d22fb4571c3d393b1babe8ee89f7ca6b1f046d0de9a9a66d |
 
 ## Notes field
 
-Plain text, 957 characters. Paste verbatim.
+Plain text, 981 characters. Paste verbatim.
 
 > Non is a bonded constitutional tribunal. It settles one contested question
 > on-chain: do a proposal's material claims meet a pinned constitution under
@@ -37,12 +39,12 @@ Plain text, 957 characters. Paste verbatim.
 >
 > Proposers and challengers each bond 2 GEN, with a 6h appeal window. A final
 > REJECT forfeits the proposer's bond; a failed challenge forfeits the
-> challenger's. INCONCLUSIVE and REVISE refund exactly, no fee. A stuck case
-> expires after 72h and returns every bond.
+> challenger's. INCONCLUSIVE and REVISE refund exactly. A stuck case expires
+> after 72h and returns every bond.
 >
-> Live: two real bonded cases adjudicated (NON-000001, NON-000002, both
-> APPROVE). A non-party calling expire_case was refused on chain. 177 tests
-> pass; lint clean.
+> Live: three real bonded cases adjudicated. Two honest ones returned
+> APPROVE; a third, whose claims contradicted its own evidence, returned
+> REJECT naming each defect. 177 tests pass; lint clean.
 
 ## What GenLayer decides
 
@@ -60,12 +62,19 @@ each validator fetches for itself. Neither is computable from on-chain data.
 
 ## Known limitations, stated up front
 
-- **`finalize` has run on chain** (both cases, links above) and the ledger it
-  wrote matches `settle_accounting` exactly: 4 GEN to the proposer, 0 to the
-  treasury — live confirmation that the protocol fee applies to slashed bonds
-  only. **`claim()` has not**, and cannot be shown for these cases: the
+- **`finalize` has run on chain** for the two APPROVE cases, and the ledger
+  it wrote matches `settle_accounting` exactly: 4 GEN to the proposer, 0 to
+  the treasury — live confirmation that the protocol fee applies to slashed
+  bonds only. **`claim()` has not**, and cannot be shown for those cases: the
   credited address is the retired deploy key. The payout call is exercised
   directly in gltest against `emit_transfer`.
+- **A REJECT verdict has been produced live** (NON-000003, on deliberately
+  false claims). **The slash it implies has not settled yet** — the 6h appeal
+  window is still open, so the bond is held and the treasury reads 0. On that
+  case the proposer and treasury are the same address, so the settlement will
+  demonstrate the contract's routing decision rather than a transfer between
+  distinct parties; the faucet was tried first and credits nothing on this
+  network.
 - `challenge` and re-evaluation have not run on chain — a challenge must land
   inside a 6h window whose floor is deliberately not loosenable. Covered in
   gltest with value conservation asserted on every branch.

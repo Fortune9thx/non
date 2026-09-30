@@ -54,9 +54,15 @@ One-way, toward the outcome that moves no money.
 [`0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c`](https://explorer-studio-dev.genlayer.com/address/0x98dE8a0F72d62F806B02a18a2e24326f82E1Ba6c), verified by `gen_getContractSchema` and a
 real on-chain `get_config` read.
 
-Two real cases, **NON-000001** and **NON-000002**, have each been opened with a
-2 GEN bond and adjudicated live: both evidence URLs fetched over HTTPS, a real
-prompt run, and validator consensus reached on an **APPROVE** in both. The
+Three real cases have each been opened with a 2 GEN bond and adjudicated
+live, with the evidence URLs fetched over HTTPS, a real prompt run, and
+validator consensus reached on every one. **NON-000001** and **NON-000002**
+were honest proposals and returned **APPROVE**. **NON-000003** submitted
+claims that were false against the very evidence it cited — a Rust codebase
+that is Python, a GPL licence that is MIT, and a budget over the
+constitutional ceiling — and returned **REJECT**, naming all three defects
+separately. The tribunal discriminates, and that is shown on chain rather
+than argued. The
 `expire_case` authentication fix was also proven live — a non-party calling it
 was refused with `not a party to this case`, leaving the case untouched.
 
@@ -71,8 +77,9 @@ discovered:
 
 - **`claim()`** — the payout call. The bonds are credited to the retired
   deploy key, so nobody can call it for these two cases.
-- **An adverse verdict.** Every live case so far returned APPROVE, so no bond
-  has actually been slashed on chain and the treasury has never been paid.
+- **The slash itself.** An adverse verdict *has* now been produced live —
+  NON-000003 returned REJECT on false claims — but its 6h appeal window is
+  still open, so no bond has actually moved to the treasury yet.
 - **`challenge` and re-evaluation** — a challenge must land inside a 6h window.
 - **A successful `expire_case`** — needs a case stuck for 72h. Only its
   refusal path has run live.

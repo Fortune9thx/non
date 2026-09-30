@@ -141,6 +141,58 @@ the ephemeral deploy key described above, which was not retained. The payout
 call itself is covered in gltest, where it is exercised directly rather than
 mocked.
 
+## Adverse verdict produced live (2026-09-30)
+
+The two cases above were both honest proposals and both returned APPROVE,
+which left the punishing half of the mechanism undemonstrated on chain. So a
+third case was submitted whose material claims are **false**, and false in a
+way the evidence it cites settles directly. Nothing about the submission
+steers the outcome: the claims are simply untrue, the evidence is the same
+real pair of URLs, and the constitution is the same pinned v1.0.
+
+**NON-000003 — "Fund a Rust rewrite of Non", requesting 5000 GEN**
+
+| Claim | Reality |
+| --- | --- |
+| "written primarily in Rust" | Python and TypeScript |
+| "released under the GPL-3.0 licence" | MIT, per the `LICENSE` file it cites |
+| 5000 GEN requested | the scope's own constitutional ceiling is 1000 GEN |
+
+| | |
+| --- | --- |
+| Opened | [`0x63ab09f617…`](https://explorer-studio-dev.genlayer.com/tx/0x63ab09f6173a227c13a9f776ddf7f6d535cec03314073fe9487f97c4e9e8e861) — 2 GEN review bond |
+| Evaluated | [`0x6d62a6bea8…`](https://explorer-studio-dev.genlayer.com/tx/0x6d62a6bea80a3db2fb9b36af91a5b3cc4fddee139fbc7f7b575c35e778767de5) — `MAJORITY_AGREE` / `FINISHED_WITH_RETURN` |
+| Verdict | **REJECT** / `rejected` |
+| Scores | 10 / fit 5 / risk 90 (against 95 / 100 / 5 for the honest cases) |
+
+The recorded reasoning caught all three defects independently:
+
+> The proposal requests 5000 GEN, exceeding the constitutional
+> max_budget_gen of 1000. Claim 1 (Rust codebase) has no supporting
+> evidence. Claim 2 (GPL-3.0 license) is contradicted by evidence showing an
+> MIT License.
+
+That is the tribunal discriminating, not merely processing — and it
+distinguishes three different failure kinds in one pass: a constitutional
+violation, an unsupported claim, and a claim actively contradicted by the
+submitter's own evidence.
+
+**The slash itself is not yet settled.** `finalize` cannot run until the 6h
+appeal window closes, so the bond is still held and `get_claimable` for the
+treasury still reads 0. When it settles, `settle_accounting` sends the fee
+and the remainder to the treasury rather than back to the proposer — the
+opposite routing to the two APPROVE cases, which is the property worth
+checking. Disclosed here rather than implied by the verdict.
+
+**Both the proposer and the treasury are `0xC6E6…e537`** on this case, so no
+value changes hands between distinct parties. The network's `sim_fundAccount`
+faucet was tried first to fund a separate proposer; it finalizes but credits
+nothing, so a distinct funded party was not available. What is demonstrated is
+the contract's accounting *decision* — which ledger slot the bond is routed
+to — and that is verifiable by reading `get_claimable` either way.
+
+Viewable at https://non-omega.vercel.app/app/cases/NON-000003.
+
 ## Live cases
 
 Two real cases were opened with genuine 2 GEN bonds and adjudicated on chain
